@@ -384,24 +384,50 @@ app.get('/api/agents/config/list', (req, res) => {
     const workspacePath = '/root/.openclaw/workspace';
     const agents = [];
     
-    // 主 Agent - 读取 workspace 根目录的配置文件
+    // 主 Agent - 读取 workspace 根目录的所有 .md 文件
     const mainFiles = [];
-    const mainConfigFiles = ['SOUL.md', 'MEMORY.md', 'USER.md', 'IDENTITY.md', 'AGENTS.md', 'TOOLS.md', 'HEARTBEAT.md'];
-    mainConfigFiles.forEach(file => {
-      const filePath = path.join(workspacePath, file);
-      if (fs.existsSync(filePath)) {
-        mainFiles.push({ name: file, path: file });
-      }
-    });
+    
+    // 扫描根目录下所有 .md 文件
+    const rootFiles = fs.readdirSync(workspacePath)
+      .filter(f => f.endsWith('.md') && fs.statSync(path.join(workspacePath, f)).isFile())
+      .map(f => ({ name: f, path: f }));
+    mainFiles.push(...rootFiles);
     
     // 读取 memory 目录
     const memoryPath = path.join(workspacePath, 'memory');
     if (fs.existsSync(memoryPath)) {
       const memoryFiles = fs.readdirSync(memoryPath)
         .filter(f => f.endsWith('.md'))
-        .slice(0, 10) // 最多 10 个
         .map(f => ({ name: f, path: `memory/${f}` }));
       mainFiles.push(...memoryFiles);
+    }
+    
+    // 读取 skills 目录下的技能配置
+    const skillsPath = path.join(workspacePath, 'skills');
+    if (fs.existsSync(skillsPath)) {
+      const skillDirs = fs.readdirSync(skillsPath).filter(f => {
+        const stat = fs.statSync(path.join(skillsPath, f));
+        return stat.isDirectory();
+      });
+      
+      skillDirs.forEach(skillDir => {
+        const skillFiles = [];
+        const skillFullPath = path.join(skillsPath, skillDir);
+        
+        // 读取每个 skill 目录下的 .md 文件
+        const files = fs.readdirSync(skillFullPath)
+          .filter(f => f.endsWith('.md'))
+          .map(f => ({ name: f, path: `skills/${skillDir}/${f}` }));
+        
+        skillFiles.push(...files);
+        
+        agents.push({
+          id: `skill-${skillDir}`,
+          name: formatAgentName(skillDir),
+          path: skillFullPath,
+          files: skillFiles,
+        });
+      });
     }
     
     agents.push({
@@ -410,34 +436,6 @@ app.get('/api/agents/config/list', (req, res) => {
       path: workspacePath,
       files: mainFiles,
     });
-    
-    // 子 Agent - 读取 agents 目录
-    const agentsPath = path.join(workspacePath, 'agents');
-    if (fs.existsSync(agentsPath)) {
-      const agentDirs = fs.readdirSync(agentsPath).filter(f => {
-        const stat = fs.statSync(path.join(agentsPath, f));
-        return stat.isDirectory();
-      });
-      
-      agentDirs.forEach(agentDir => {
-        const agentFiles = [];
-        const agentFullPath = path.join(agentsPath, agentDir);
-        
-        // 读取每个 agent 目录下的 .md 文件
-        const files = fs.readdirSync(agentFullPath)
-          .filter(f => f.endsWith('.md'))
-          .map(f => ({ name: f, path: f }));
-        
-        agentFiles.push(...files);
-        
-        agents.push({
-          id: agentDir,
-          name: formatAgentName(agentDir),
-          path: agentFullPath,
-          files: agentFiles,
-        });
-      });
-    }
     
     res.json({ agents });
     console.log('[API] 返回 Agent 配置列表:', agents.length, '个');
@@ -451,10 +449,10 @@ app.get('/api/agents/config/list', (req, res) => {
 });
 
 /**
- * GET /api/agents/config/:agentId/file/:fileName
+ * GET /api/agents/:agentId/config/:fileName
  * 获取 Agent 配置文件内容（真实文件）
  */
-app.get('/api/agents/config/:agentId/file/:fileName', (req, res) => {
+app.get('/api/agents/:agentId/config/:fileName', (req, res) => {
   try {
     const { agentId, fileName } = req.params;
     const workspacePath = '/root/.openclaw/workspace';
@@ -465,8 +463,8 @@ app.get('/api/agents/config/:agentId/file/:fileName', (req, res) => {
       // 主 Agent - 直接在 workspace 根目录
       filePath = path.join(workspacePath, fileName);
     } else {
-      // 子 Agent - 在 agents 目录下
-      filePath = path.join(workspacePath, 'agents', agentId, fileName);
+      // 子 Agent - 在 skills 或其他目录下（暂时返回主目录）
+      filePath = path.join(workspacePath, fileName);
     }
     
     console.log(`[API] 读取配置文件：${filePath}`);
@@ -476,6 +474,8 @@ app.get('/api/agents/config/:agentId/file/:fileName', (req, res) => {
       return res.status(404).json({
         error: '文件不存在',
         path: filePath,
+        agentId,
+        fileName,
       });
     }
     
@@ -487,6 +487,7 @@ app.get('/api/agents/config/:agentId/file/:fileName', (req, res) => {
       content: content,
       agentId: agentId,
       path: filePath,
+      success: true,
     });
   } catch (error) {
     console.error('[API] 获取配置文件失败:', error.message);
@@ -498,10 +499,10 @@ app.get('/api/agents/config/:agentId/file/:fileName', (req, res) => {
 });
 
 /**
- * POST /api/agents/config/:agentId/file/:fileName
+ * PUT /api/agents/:agentId/config/:fileName
  * 保存 Agent 配置文件（真实文件）
  */
-app.post('/api/agents/config/:agentId/file/:fileName', (req, res) => {
+app.put('/api/agents/:agentId/config/:fileName', (req, res) => {
   try {
     const { agentId, fileName } = req.params;
     const { content } = req.body;
@@ -512,7 +513,7 @@ app.post('/api/agents/config/:agentId/file/:fileName', (req, res) => {
     if (agentId === 'main') {
       filePath = path.join(workspacePath, fileName);
     } else {
-      filePath = path.join(workspacePath, 'agents', agentId, fileName);
+      filePath = path.join(workspacePath, fileName);
     }
     
     console.log(`[API] 保存配置文件：${filePath}`);
