@@ -2,7 +2,6 @@ import dayjs from 'dayjs';
 import api from '@/services/api';
 import type { Agent } from '@/types';
 import { useState, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
 
 interface LogDetailModalProps {
   agent: Agent & { timestamp?: number };
@@ -31,67 +30,23 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'logs' | 'tools' | 'messages'>('logs');
-  const [isRealtime, setIsRealtime] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadHistory();
     
-    // 只连接一次，不随 isPaused 变化重连
-    const ws = io('http://localhost:3001', {
-      reconnection: true,
-      reconnectionAttempts: 3, // 最多重试 3 次
-      reconnectionDelay: 1000,
-      timeout: 3000, // 超时 3 秒
-    });
-    
-    let connectAttempts = 0;
-    
-    ws.on('connect', () => {
-      console.log('[WebSocket] 已连接');
-      connectAttempts = 0;
-      
-      // 订阅日志
-      const sessionId = agent.id.split(':').pop();
-      if (sessionId) {
-        ws.emit('subscribe:logs', sessionId);
-        setIsRealtime(true);
-      }
-    });
-    
-    ws.on('connect_error', (error) => {
-      connectAttempts++;
-      console.warn(`[WebSocket] 连接失败 (${connectAttempts}/3):`, error.message);
-      
-      if (connectAttempts >= 3) {
-        console.warn('[WebSocket] 达到最大重试次数，停止连接');
-        setIsRealtime(false);
-      }
-    });
-    
-    ws.on('log:new', (log: LogEntry) => {
+    // 轮询加载最新数据（每 3 秒一次，暂停时停止）
+    const interval = setInterval(() => {
       if (!isPaused) {
-        setLogs(prev => {
-          // 限制最多 1000 条日志，防止内存累积
-          const updated = [...prev, log];
-          return updated.slice(-1000);
-        });
-        // 自动滚动到底部
-        setTimeout(() => {
-          logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+        loadHistory();
       }
-    });
+    }, 3000);
     
-    return () => {
-      console.log('[WebSocket] 清理连接');
-      ws.removeAllListeners();
-      ws.disconnect();
-    };
-  }, [agent.id]); // 移除 isPaused 依赖，只随 agent.id 变化
+    return () => clearInterval(interval);
+  }, [agent.id, isPaused]);
 
-  // 暂停/恢复实时日志
+  // 暂停/恢复自动刷新
   function togglePause() {
     setIsPaused(!isPaused);
   }
@@ -100,89 +55,84 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
     try {
       setLoading(true);
       
-      // 尝试获取会话历史
-      const sessionId = agent.id.split(':').pop();
-      if (sessionId) {
-        const response = await api.get(`/sessions/${sessionId}/history`);
-        
-        const historyLogs: LogEntry[] = [];
-        const tools: ToolCall[] = [];
-        
-        // 解析历史消息
-        if (response.data.history) {
-          response.data.history.forEach((msg: any) => {
-            // 用户消息
-            if (msg.role === 'user') {
+      // 调用新的历史 API（读取 JSONL 文件）
+      const response = await api.get(`/sessions/${agent.id}/history`);
+      
+      const historyLogs: LogEntry[] = [];
+      const tools: ToolCall[] = [];
+      
+      // 解析历史消息
+      if (response.data.history && response.data.history.length > 0) {
+        response.data.history.forEach((msg: any) => {
+          // 用户消息
+          if (msg.role === 'user') {
+            historyLogs.push({
+              timestamp: msg.timestamp || Date.now(),
+              level: 'INFO' as const,
+              message: `👤 用户：${msg.content?.substring(0, 100) || '...'}`,
+              type: 'message' as const,
+            });
+          }
+          
+          // Assistant 消息
+          if (msg.role === 'assistant') {
+            historyLogs.push({
+              timestamp: msg.timestamp || Date.now(),
+              level: 'INFO' as const,
+              message: `🤖 Agent: ${msg.content?.substring(0, 100) || '...'}`,
+              type: 'message' as const,
+            });
+          }
+          
+          // 工具调用（从 history 中解析）
+          if (msg.toolCalls) {
+            msg.toolCalls.forEach((tool: any) => {
+              tools.push({
+                name: tool.name || tool.tool,
+                args: tool.args || tool.input,
+                timestamp: msg.timestamp || Date.now(),
+                status: 'success' as const,
+              });
+              
               historyLogs.push({
                 timestamp: msg.timestamp || Date.now(),
-                level: 'INFO' as const,
-                message: `👤 用户：${msg.content?.substring(0, 100) || '...'}`,
-                type: 'message' as const,
+                level: 'DEBUG' as const,
+                message: `🔧 工具调用：${tool.name || tool.tool}`,
+                type: 'tool' as const,
+                details: tool,
               });
-            }
-            
-            // Assistant 消息
-            if (msg.role === 'assistant') {
-              historyLogs.push({
-                timestamp: msg.timestamp || Date.now(),
-                level: 'INFO' as const,
-                message: `🤖 Agent: ${msg.content?.substring(0, 100) || '...'}`,
-                type: 'message' as const,
-              });
-            }
-            
-            // 工具调用
-            if (msg.toolCalls) {
-              msg.toolCalls.forEach((tool: any) => {
-                tools.push({
-                  name: tool.name || tool.tool,
-                  args: tool.args || tool.input,
-                  result: tool.result,
-                  timestamp: msg.timestamp || Date.now(),
-                  status: 'success' as const,
-                });
-                
-                historyLogs.push({
-                  timestamp: msg.timestamp || Date.now(),
-                  level: 'DEBUG' as const,
-                  message: `🔧 工具调用：${tool.name || tool.tool}`,
-                  type: 'tool' as const,
-                  details: tool,
-                });
-              });
-            }
+            });
+          }
+          
+          // Tool 结果
+          if (msg.role === 'tool') {
+            historyLogs.push({
+              timestamp: msg.timestamp || Date.now(),
+              level: 'INFO' as const,
+              message: `📥 工具结果：${msg.content?.substring(0, 100) || '...'}`,
+              type: 'tool' as const,
+            });
+          }
+        });
+        
+        // 使用 API 返回的 toolCalls（如果有）
+        if (response.data.toolCalls && response.data.toolCalls.length > 0) {
+          response.data.toolCalls.forEach((tool: any) => {
+            tools.push({
+              name: tool.name,
+              args: tool.args,
+              timestamp: tool.timestamp,
+              status: tool.status as 'success' | 'error',
+            });
           });
         }
-        
-        // 如果没有历史数据，生成模拟日志
-        if (historyLogs.length === 0) {
-          const runtime = Number(agent.runtime) || 0;
-          const baseTime = Date.now() - runtime;
-          
-          historyLogs.push(
-            { timestamp: baseTime, level: 'INFO' as const, message: '✅ Agent 启动成功', type: 'system' as const },
-            { timestamp: baseTime + 1000, level: 'INFO' as const, message: `📋 开始执行任务：${agent.task || '未命名'}`, type: 'system' as const },
-            { timestamp: baseTime + 2000, level: 'DEBUG' as const, message: `🧠 加载模型：${agent.model || 'unknown'}`, type: 'system' as const },
-            { timestamp: baseTime + 5000, level: 'INFO' as const, message: '⚙️ 处理用户请求...', type: 'system' as const },
-            { timestamp: baseTime + 10000, level: 'INFO' as const, message: `📊 Token 消耗：${(Number(agent.totalTokens) || 0) / 1000}k`, type: 'system' as const },
-          );
-          
-          if (agent.status === 'done') {
-            historyLogs.push(
-              { timestamp: baseTime + runtime - 5000, level: 'INFO' as const, message: '✨ 正在生成响应...', type: 'system' as const },
-              { timestamp: baseTime + runtime, level: 'INFO' as const, message: '✅ 任务完成', type: 'system' as const },
-            );
-          } else if (agent.status === 'failed') {
-            historyLogs.push(
-              { timestamp: baseTime + runtime, level: 'ERROR' as const, message: '❌ 任务失败', type: 'system' as const },
-            );
-          } else {
-            historyLogs.push(
-              { timestamp: Date.now() - 10000, level: 'INFO' as const, message: '⏳ 继续执行中...', type: 'system' as const },
-            );
-          }
-        }
-        
+      }
+      
+      // 如果没有历史数据，生成模拟日志
+      if (historyLogs.length === 0) {
+        setLogs(generateMockLogs());
+        setToolCalls([]);
+      } else {
         setLogs(historyLogs.sort((a, b) => a.timestamp - b.timestamp));
         setToolCalls(tools);
       }
@@ -190,6 +140,7 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
       console.error('加载日志失败:', error);
       // 使用模拟数据
       setLogs(generateMockLogs());
+      setToolCalls([]);
     } finally {
       setLoading(false);
     }
@@ -255,24 +206,20 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
             <p className="text-sm text-gray-400 mt-1 font-mono">{agent.id}</p>
           </div>
           <div className="flex items-center space-x-3">
-            {isRealtime && (
-              <div className="flex items-center space-x-2 px-3 py-1.5 rounded bg-gray-700">
-                <span className={`w-2 h-2 rounded-full ${isPaused ? 'bg-yellow-400' : 'bg-green-400 animate-pulse'}`}></span>
-                <span className="text-xs text-gray-300">{isPaused ? '已暂停' : '实时日志'}</span>
-              </div>
-            )}
-            {isRealtime && (
-              <button
-                onClick={togglePause}
-                className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                  isPaused 
-                    ? 'bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50'
-                    : 'bg-yellow-900/30 text-yellow-400 border border-yellow-700 hover:bg-yellow-900/50'
-                }`}
-              >
-                {isPaused ? '▶️ 继续' : '⏸️ 暂停'}
-              </button>
-            )}
+            <div className="flex items-center space-x-2 px-3 py-1.5 rounded bg-gray-700">
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+              <span className="text-xs text-gray-300">自动刷新（3 秒）</span>
+            </div>
+            <button
+              onClick={togglePause}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                isPaused 
+                  ? 'bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50'
+                  : 'bg-yellow-900/30 text-yellow-400 border border-yellow-700 hover:bg-yellow-900/50'
+              }`}
+            >
+              {isPaused ? '▶️ 继续' : '⏸️ 暂停'}
+            </button>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors text-2xl"

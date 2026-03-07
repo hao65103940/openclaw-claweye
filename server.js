@@ -352,25 +352,125 @@ app.get('/api/trace/subagents', (req, res) => {
 
 /**
  * GET /api/sessions/:sessionId/history
- * 获取会话历史日志
+ * 获取会话历史日志（从 JSONL 文件读取）
  */
-app.get('/api/sessions/:sessionId/history', (req, res) => {
+app.get('/api/sessions/:sessionId/history', async (req, res) => {
   try {
     const sessionId = req.params.sessionId;
     console.log(`[API] 请求会话历史：${sessionId}`);
     
-    // OpenClaw 不直接提供会话历史，返回空数组
-    // 前端会显示模拟日志
-    res.json({
-      history: [],
+    // 1. 从 sessions.json 查找对应的 jsonl 文件路径
+    const sessionsIndexPath = '/root/.openclaw/agents/main/sessions/sessions.json';
+    
+    if (!fs.existsSync(sessionsIndexPath)) {
+      return res.status(404).json({ 
+        error: '会话索引文件不存在',
+        sessionId,
+      });
+    }
+    
+    const sessionsIndex = JSON.parse(fs.readFileSync(sessionsIndexPath, 'utf-8'));
+    const sessionInfo = sessionsIndex[sessionId];
+    
+    if (!sessionInfo || !sessionInfo.sessionId) {
+      return res.status(404).json({ 
+        error: '会话不存在',
+        sessionId,
+      });
+    }
+    
+    // 2. 构建 jsonl 文件路径
+    const actualSessionId = sessionInfo.sessionId;
+    const jsonlPath = `/root/.openclaw/agents/main/sessions/${actualSessionId}.jsonl`;
+    
+    if (!fs.existsSync(jsonlPath)) {
+      return res.status(404).json({ 
+        error: '会话日志文件不存在',
+        sessionId,
+        actualSessionId,
+      });
+    }
+    
+    // 3. 读取并解析 JSONL 文件
+    const content = fs.readFileSync(jsonlPath, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+    
+    // 4. 解析每条记录，只返回 type='message' 的记录
+    const history = [];
+    const toolCalls = [];
+    
+    for (const line of lines) {
+      try {
+        const record = JSON.parse(line);
+        
+        if (record.type === 'message' && record.message) {
+          const message = {
+            role: record.message.role,
+            timestamp: new Date(record.timestamp).getTime(),
+            content: null,
+            toolCalls: null,
+          };
+          
+          // 解析 content（可能是字符串或数组）
+          if (Array.isArray(record.message.content)) {
+            // 提取文本内容
+            const textParts = record.message.content
+              .filter(item => item.type === 'text')
+              .map(item => item.text)
+              .join('');
+            message.content = textParts;
+            
+            // 提取工具调用
+            const tools = record.message.content
+              .filter(item => item.type === 'toolCall')
+              .map(item => ({
+                id: item.id,
+                name: item.name,
+                args: item.args,
+              }));
+            if (tools.length > 0) {
+              message.toolCalls = tools;
+              toolCalls.push(...tools.map(t => ({
+                name: t.name,
+                args: t.args,
+                timestamp: message.timestamp,
+                status: 'success',
+              })));
+            }
+          } else if (typeof record.message.content === 'string') {
+            message.content = record.message.content;
+          }
+          
+          // 处理 toolResult
+          if (record.message.role === 'toolResult') {
+            message.role = 'tool';
+            message.content = record.message.content?.[0]?.text || JSON.stringify(record.message.content);
+          }
+          
+          history.push(message);
+        }
+      } catch (parseError) {
+        console.warn(`[API] 解析 JSONL 行失败：${parseError.message}`);
+        // 跳过无法解析的行
+      }
+    }
+    
+    console.log(`[API] 返回会话历史：${history.length} 条消息，${toolCalls.length} 个工具调用`);
+    
+    res.json({ 
+      history,
+      toolCalls,
       sessionId,
-      note: 'OpenClaw 不提供会话历史 API',
+      actualSessionId,
+      source: 'jsonl',
+      totalLines: lines.length,
     });
   } catch (error) {
     console.error('[API] 获取会话历史失败:', error.message);
     res.status(500).json({ 
       error: '获取数据失败',
       details: error.message,
+      stack: error.stack,
     });
   }
 });
