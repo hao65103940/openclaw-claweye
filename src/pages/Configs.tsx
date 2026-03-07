@@ -176,14 +176,14 @@ function ConfigCard({ config, onExpand, isExpanded }: {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-lg">{getFileIcon(file.type)}</span>
-                      <span className="text-white text-sm">{file.path}</span>
+                    <div className="flex items-center space-x-2 min-w-0 flex-1">
+                      <span className="text-lg flex-shrink-0">{getFileIcon(file.type)}</span>
+                      <span className="text-white text-sm truncate" title={file.path}>{file.path}</span>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</span>
+                    <div className="flex items-center space-x-3 flex-shrink-0 ml-2">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">{(file.size / 1024).toFixed(1)} KB</span>
                       {loadingFile === file.path && (
-                        <span className="animate-spin">🔄</span>
+                        <span className="animate-spin flex-shrink-0">🔄</span>
                       )}
                     </div>
                   </div>
