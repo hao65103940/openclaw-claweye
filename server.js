@@ -376,46 +376,137 @@ app.get('/api/sessions/:sessionId/history', (req, res) => {
 });
 
 /**
+ * 递归扫描目录获取文件列表
+ */
+function scanDirectory(dirPath, relativePath = '', maxDepth = 3, currentDepth = 0) {
+  const files = [];
+  
+  if (currentDepth > maxDepth) return files;
+  
+  try {
+    const items = fs.readdirSync(dirPath);
+    
+    for (const item of items) {
+      // 跳过隐藏文件和 node_modules
+      if (item.startsWith('.') && item !== '.openclaw') continue;
+      if (item === 'node_modules') continue;
+      
+      const fullPath = path.join(dirPath, item);
+      const relPath = relativePath ? `${relativePath}/${item}` : item;
+      const stat = fs.statSync(fullPath);
+      
+      if (stat.isFile()) {
+        // 只包含可编辑的文件类型
+        const ext = path.extname(item).toLowerCase();
+        const editableExts = ['.md', '.txt', '.json', '.js', '.ts', '.tsx', '.jsx', '.py', '.yaml', '.yml', '.html', '.css', '.sh', '.env', '.toml', '.xml'];
+        
+        if (editableExts.includes(ext) || ext === '') {
+          files.push({
+            name: item,
+            path: relPath,
+            fullPath: fullPath,
+            size: stat.size,
+            type: getFileType(ext),
+            ext: ext,
+          });
+        }
+      } else if (stat.isDirectory()) {
+        // 递归扫描子目录
+        const subFiles = scanDirectory(fullPath, relPath, maxDepth, currentDepth + 1);
+        files.push(...subFiles);
+      }
+    }
+  } catch (error) {
+    console.error(`扫描目录失败 ${dirPath}:`, error.message);
+  }
+  
+  return files;
+}
+
+/**
+ * 获取文件类型
+ */
+function getFileType(ext) {
+  const types = {
+    '.md': 'markdown',
+    '.txt': 'text',
+    '.json': 'json',
+    '.js': 'javascript',
+    '.ts': 'typescript',
+    '.tsx': 'typescript',
+    '.jsx': 'javascript',
+    '.py': 'python',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
+    '.html': 'html',
+    '.css': 'css',
+    '.sh': 'shell',
+    '.env': 'env',
+    '.toml': 'toml',
+    '.xml': 'xml',
+  };
+  return types[ext] || 'text';
+}
+
+/**
  * GET /api/agents/config/list
- * 获取配置列表（按类型分组：agents、skills）
+ * 获取配置列表（包含 agents 和 workspace 所有文件）
  */
 app.get('/api/agents/config/list', (req, res) => {
   try {
-    const workspacePath = '/root/.openclaw/workspace';
-    
     const result = {
       agents: [],
+      workspace: [],
       skills: [],
     };
     
-    // ========== 1. Agents 配置 ==========
-    // 主 Agent - 读取 workspace 根目录的所有 .md 文件
-    const mainFiles = [];
-    
-    // 扫描根目录下所有 .md 文件
-    const rootFiles = fs.readdirSync(workspacePath)
-      .filter(f => f.endsWith('.md') && fs.statSync(path.join(workspacePath, f)).isFile())
-      .map(f => ({ name: f, path: f }));
-    mainFiles.push(...rootFiles);
-    
-    // 读取 memory 目录
-    const memoryPath = path.join(workspacePath, 'memory');
-    if (fs.existsSync(memoryPath)) {
-      const memoryFiles = fs.readdirSync(memoryPath)
-        .filter(f => f.endsWith('.md'))
-        .map(f => ({ name: f, path: `memory/${f}` }));
-      mainFiles.push(...memoryFiles);
+    // ========== 1. /root/.openclaw/agents 目录 ==========
+    const agentsPath = '/root/.openclaw/agents';
+    if (fs.existsSync(agentsPath)) {
+      const agentDirs = fs.readdirSync(agentsPath).filter(f => {
+        const stat = fs.statSync(path.join(agentsPath, f));
+        return stat.isDirectory();
+      });
+      
+      agentDirs.forEach(agentDir => {
+        const agentFullPath = path.join(agentsPath, agentDir);
+        const files = scanDirectory(agentFullPath, '', 2);
+        
+        result.agents.push({
+          id: `agent-${agentDir}`,
+          name: formatAgentName(agentDir),
+          path: agentFullPath,
+          files: files,
+          category: 'agent',
+        });
+      });
     }
     
-    result.agents.push({
-      id: 'main',
-      name: '主 Agent (夏娃 Eve ✨)',
-      path: workspacePath,
-      files: mainFiles,
-      category: 'agent',
-    });
+    // ========== 2. /root/.openclaw/workspace 目录 ==========
+    const workspacePath = '/root/.openclaw/workspace';
+    if (fs.existsSync(workspacePath)) {
+      const workspaceFiles = scanDirectory(workspacePath, '', 3);
+      
+      // 按目录分组
+      const dirGroups = {};
+      workspaceFiles.forEach(file => {
+        const dir = path.dirname(file.path);
+        if (!dirGroups[dir]) {
+          dirGroups[dir] = {
+            id: `workspace-${dir === '.' ? 'root' : dir.replace(/\//g, '-')}`,
+            name: dir === '.' ? '根目录' : dir,
+            path: path.join(workspacePath, dir),
+            files: [],
+            category: 'workspace',
+          };
+        }
+        dirGroups[dir].files.push(file);
+      });
+      
+      result.workspace = Object.values(dirGroups);
+    }
     
-    // ========== 2. Skills 配置 ==========
+    // ========== 3. /root/.openclaw/workspace/skills 目录 ==========
     const skillsPath = path.join(workspacePath, 'skills');
     if (fs.existsSync(skillsPath)) {
       const skillDirs = fs.readdirSync(skillsPath).filter(f => {
@@ -424,31 +515,27 @@ app.get('/api/agents/config/list', (req, res) => {
       });
       
       skillDirs.forEach(skillDir => {
-        const skillFiles = [];
         const skillFullPath = path.join(skillsPath, skillDir);
-        
-        // 读取每个 skill 目录下的 .md 文件
-        const files = fs.readdirSync(skillFullPath)
-          .filter(f => f.endsWith('.md'))
-          .map(f => ({ name: f, path: `skills/${skillDir}/${f}` }));
-        
-        skillFiles.push(...files);
+        const files = scanDirectory(skillFullPath, '', 2);
         
         result.skills.push({
           id: `skill-${skillDir}`,
           name: formatAgentName(skillDir),
           path: skillFullPath,
-          files: skillFiles,
+          files: files,
           category: 'skill',
         });
       });
     }
     
     // 按名称排序
+    result.agents.sort((a, b) => a.name.localeCompare(b.name));
     result.skills.sort((a, b) => a.name.localeCompare(b.name));
     
     res.json(result);
-    console.log('[API] 返回配置列表：Agents:', result.agents.length, 'Skills:', result.skills.length);
+    console.log('[API] 返回配置列表 - Agents:', result.agents.length, 
+                'Workspace:', result.workspace.length, 
+                'Skills:', result.skills.length);
   } catch (error) {
     console.error('[API] 获取配置列表失败:', error.message);
     res.status(500).json({ 
@@ -459,33 +546,44 @@ app.get('/api/agents/config/list', (req, res) => {
 });
 
 /**
- * GET /api/agents/:agentId/config/:fileName
- * 获取 Agent 配置文件内容（真实文件）
+ * GET /api/file/read
+ * 读取任意文件内容
+ * Query params: path (文件完整路径)
  */
-app.get('/api/agents/:agentId/config/:fileName', (req, res) => {
+app.get('/api/file/read', (req, res) => {
   try {
-    const { agentId, fileName } = req.params;
-    const workspacePath = '/root/.openclaw/workspace';
+    const filePath = req.query.path;
     
-    // 构建文件路径
-    let filePath;
-    if (agentId === 'main') {
-      // 主 Agent - 直接在 workspace 根目录
-      filePath = path.join(workspacePath, fileName);
-    } else {
-      // 子 Agent - 在 skills 或其他目录下（暂时返回主目录）
-      filePath = path.join(workspacePath, fileName);
+    if (!filePath) {
+      return res.status(400).json({
+        error: '缺少 path 参数',
+      });
     }
     
-    console.log(`[API] 读取配置文件：${filePath}`);
+    // 安全限制：只能读取 /root/.openclaw 下的文件
+    if (!filePath.startsWith('/root/.openclaw/')) {
+      return res.status(403).json({
+        error: '禁止访问此路径',
+        path: filePath,
+      });
+    }
+    
+    console.log(`[API] 读取文件：${filePath}`);
     
     // 检查文件是否存在
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         error: '文件不存在',
         path: filePath,
-        agentId,
-        fileName,
+      });
+    }
+    
+    // 检查是否是目录
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      return res.status(400).json({
+        error: '这是一个目录，不是文件',
+        path: filePath,
       });
     }
     
@@ -493,53 +591,58 @@ app.get('/api/agents/:agentId/config/:fileName', (req, res) => {
     const content = fs.readFileSync(filePath, 'utf-8');
     
     res.json({
-      file: fileName,
-      content: content,
-      agentId: agentId,
-      path: filePath,
       success: true,
+      file: path.basename(filePath),
+      content: content,
+      path: filePath,
+      size: stat.size,
+      type: getFileType(path.extname(filePath)),
     });
   } catch (error) {
-    console.error('[API] 获取配置文件失败:', error.message);
+    console.error('[API] 读取文件失败:', error.message);
     res.status(500).json({ 
-      error: '获取数据失败',
+      error: '读取失败',
       details: error.message,
     });
   }
 });
 
 /**
- * PUT /api/agents/:agentId/config/:fileName
- * 保存 Agent 配置文件（真实文件）
+ * PUT /api/file/save
+ * 保存文件内容
+ * Body: { path, content }
  */
-app.put('/api/agents/:agentId/config/:fileName', (req, res) => {
+app.put('/api/file/save', (req, res) => {
   try {
-    const { agentId, fileName } = req.params;
-    const { content } = req.body;
-    const workspacePath = '/root/.openclaw/workspace';
+    const { path: filePath, content } = req.body;
     
-    // 构建文件路径
-    let filePath;
-    if (agentId === 'main') {
-      filePath = path.join(workspacePath, fileName);
-    } else {
-      filePath = path.join(workspacePath, fileName);
+    if (!filePath || content === undefined) {
+      return res.status(400).json({
+        error: '缺少 path 或 content 参数',
+      });
     }
     
-    console.log(`[API] 保存配置文件：${filePath}`);
+    // 安全限制：只能写入 /root/.openclaw 下的文件
+    if (!filePath.startsWith('/root/.openclaw/')) {
+      return res.status(403).json({
+        error: '禁止写入此路径',
+        path: filePath,
+      });
+    }
+    
+    console.log(`[API] 保存文件：${filePath} (${content.length} bytes)`);
     
     // 写入文件
     fs.writeFileSync(filePath, content, 'utf-8');
     
     res.json({
       success: true,
-      message: '配置已保存',
-      agentId,
-      fileName,
+      message: '文件已保存',
       path: filePath,
+      size: content.length,
     });
   } catch (error) {
-    console.error('[API] 保存配置文件失败:', error.message);
+    console.error('[API] 保存文件失败:', error.message);
     res.status(500).json({ 
       error: '保存失败',
       details: error.message,
