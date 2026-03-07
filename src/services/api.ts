@@ -7,38 +7,36 @@ const API_BASE = '/api';
 // 全局数据模式（可动态切换）
 let USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
-// 失败计数器 - 防止无限重试
-let apiFailCount = 0;
-const MAX_API_FAIL_COUNT = 5; // 最大失败次数（因为每次刷新调用 2 次 API，实际约 2-3 轮）
-let apiStopped = false; // API 停止标志
+// API 停止标志 - 由 useAgentStore 管理
+let apiStopped = false;
 
 // 创建 axios 实例
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 5000, // 缩短超时时间到 5 秒
+  timeout: 5000, // 超时 5 秒
 });
 
 /**
- * 重置失败计数器
+ * 重置 API 停止状态
  */
-export function resetApiFailCount() {
-  apiFailCount = 0;
+export function resetApiStopped() {
   apiStopped = false;
-  console.log('[API] 失败计数器已重置');
+  console.log('[API] API 停止状态已重置');
 }
 
 /**
- * 检查是否已达到最大失败次数
+ * 检查 API 是否已停止
  */
-export function shouldStopRetry(): boolean {
+export function isApiStopped(): boolean {
   return apiStopped;
 }
 
 /**
  * 设置 API 停止状态
  */
-export function setApiStopped(stopped: boolean) {
-  apiStopped = stopped;
+export function markApiStopped() {
+  apiStopped = true;
+  console.warn('[API] API 已标记为停止');
 }
 
 /**
@@ -114,10 +112,7 @@ const mockData = {
  * 获取子 Agent 列表
  */
 export async function getSubagents(): Promise<SubagentsListResponse> {
-  console.log('[API] getSubagents 调用，当前模式:', USE_MOCK_DATA ? '模拟数据' : '真实数据');
-  
   if (USE_MOCK_DATA) {
-    console.log('[API] 使用模拟数据');
     await new Promise(resolve => setTimeout(resolve, 300));
     return {
       total: mockData.active.length + mockData.recent.length,
@@ -126,9 +121,8 @@ export async function getSubagents(): Promise<SubagentsListResponse> {
     };
   }
   
-  // 检查是否已达到最大失败次数
-  if (shouldStopRetry()) {
-    console.warn('[API] API 已停止，返回空数据');
+  // API 已停止则直接返回
+  if (isApiStopped()) {
     return {
       total: 0,
       active: [],
@@ -137,28 +131,12 @@ export async function getSubagents(): Promise<SubagentsListResponse> {
     };
   }
   
-  console.log('[API] 请求真实数据 API...');
   try {
     const response = await api.get('/agents/list');
-    console.log('[API] 真实数据返回:', response.data);
-    resetApiFailCount(); // 成功后重置计数器
     return response.data;
   } catch (error) {
-    apiFailCount++;
-    console.error(`[API] 真实数据请求失败 (${apiFailCount}/${MAX_API_FAIL_COUNT}):`, error);
-    
-    if (apiFailCount >= MAX_API_FAIL_COUNT) {
-      apiStopped = true;
-      console.warn('[API] 达到最大失败次数，已停止 API 请求');
-      return {
-        total: 0,
-        active: [],
-        recent: [],
-        error: 'API 连续失败，已停止重试',
-      };
-    }
-    
-    // 失败时回退到模拟数据
+    console.error('[API] getSubagents 失败:', error);
+    // 返回模拟数据（由 caller 决定是否停止）
     await new Promise(resolve => setTimeout(resolve, 300));
     return {
       total: mockData.active.length + mockData.recent.length,
@@ -198,8 +176,6 @@ export async function getSessions(limit = 20): Promise<SessionsListResponse> {
  * 获取统计数据
  */
 export async function getStats(): Promise<Stats> {
-  console.log('[API] getStats 调用，当前模式:', USE_MOCK_DATA ? '模拟数据' : '真实数据');
-  
   if (USE_MOCK_DATA) {
     await new Promise(resolve => setTimeout(resolve, 200));
     return {
@@ -214,9 +190,8 @@ export async function getStats(): Promise<Stats> {
     };
   }
   
-  // 检查是否已达到最大失败次数
-  if (shouldStopRetry()) {
-    console.warn('[API] API 已停止，返回空数据');
+  // API 已停止则直接返回
+  if (isApiStopped()) {
     return {
       totalAgents: 0,
       activeAgents: 0,
@@ -230,22 +205,12 @@ export async function getStats(): Promise<Stats> {
     };
   }
   
-  console.log('[API] 请求真实统计数据 API...');
   try {
     const response = await api.get('/stats');
-    console.log('[API] 真实统计数据返回:', response.data);
-    resetApiFailCount(); // 成功后重置计数器
     return response.data;
   } catch (error) {
-    apiFailCount++;
-    console.error(`[API] getStats 失败 (${apiFailCount}/${MAX_API_FAIL_COUNT}):`, error);
-    
-    if (apiFailCount >= MAX_API_FAIL_COUNT) {
-      apiStopped = true;
-      console.warn('[API] 达到最大失败次数，已停止 API 请求');
-    }
-    
-    // 失败时返回模拟数据（带 error 标志）
+    console.error('[API] getStats 失败:', error);
+    // 返回模拟数据（由 caller 决定是否停止）
     await new Promise(resolve => setTimeout(resolve, 200));
     return {
       totalAgents: 3,
@@ -256,7 +221,6 @@ export async function getStats(): Promise<Stats> {
       totalRuntime: 283000,
       avgRuntime: 141500,
       modelUsage: { 'qwen3.5-plus': 3 },
-      error: apiFailCount >= MAX_API_FAIL_COUNT ? 'API 连续失败，已停止重试' : undefined,
     };
   }
 }

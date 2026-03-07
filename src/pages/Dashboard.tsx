@@ -342,7 +342,7 @@ function Dashboard() {
                   API 已停止自动刷新
                 </p>
                 <p className="text-sm text-gray-400">
-                  🚫 后端服务不可用，已停止重试
+                  🚫 后端服务不可用，已连续失败 3 次
                 </p>
               </div>
             </div>

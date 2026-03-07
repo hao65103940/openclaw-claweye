@@ -20,6 +20,7 @@ interface AgentState {
   refreshInterval: number; // 刷新间隔（毫秒）
   autoRefresh: boolean; // 是否自动刷新
   apiStopped: boolean; // API 是否已停止（连续失败后）
+  failCount: number; // 失败计数器（每次 refreshAll 计数 1 次）
   
   // 操作
   fetchAgents: () => Promise<void>;
@@ -44,29 +45,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   refreshInterval: 30000, // 默认 30 秒
   autoRefresh: true, // 默认开启自动刷新
   apiStopped: false, // API 未停止
+  failCount: 0, // 失败计数 0
 
   // 获取 Agent 列表
   fetchAgents: async () => {
-    // 如果 API 已停止，不再请求
-    if (get().apiStopped) {
-      console.warn('[Store] API 已停止，跳过 fetchAgents');
-      return;
-    }
-    
     try {
       set({ loading: true, error: null });
       const data = await getSubagents();
-      
-      // 检查是否返回了错误（API 停止标志）
-      if ((data as any).error) {
-        set({
-          apiStopped: true,
-          error: 'API 连续失败，已停止重试。请检查后端服务。',
-          loading: false,
-        });
-        console.warn('[Store] API 已停止自动刷新');
-        return;
-      }
       
       set({
         activeAgents: data.active || [],
@@ -80,49 +65,59 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         error: error instanceof Error ? error.message : '获取 Agent 列表失败',
         loading: false,
       });
+      throw error; // 抛出错误，让 refreshAll 捕获
     }
   },
 
   // 获取统计数据
   fetchStats: async () => {
-    // 如果 API 已停止，不再请求
-    if (get().apiStopped) {
-      console.warn('[Store] API 已停止，跳过 fetchStats');
-      return;
-    }
-    
     try {
       const stats = await getStats();
-      
-      // 检查是否返回了错误（API 停止标志）
-      if ((stats as any).error) {
-        set({
-          apiStopped: true,
-          error: 'API 连续失败，已停止重试。请检查后端服务。',
-        });
-        console.warn('[Store] API 已停止自动刷新 (from fetchStats)');
-        return;
-      }
-      
       set({ stats });
     } catch (error) {
-      // 静默失败，不影响 UI 显示
-      console.debug('获取统计数据失败（使用模拟数据）:', error instanceof Error ? error.message : error);
+      console.debug('获取统计数据失败:', error instanceof Error ? error.message : error);
+      throw error; // 抛出错误，让 refreshAll 捕获
     }
   },
 
   // 刷新所有数据
   refreshAll: async () => {
+    const state = get();
+    
     // 如果 API 已停止，不再刷新
-    if (get().apiStopped) {
+    if (state.apiStopped) {
       console.warn('[Store] API 已停止，跳过 refreshAll');
       return;
     }
     
-    await Promise.all([
+    // 执行刷新
+    const results = await Promise.allSettled([
       get().fetchAgents(),
       get().fetchStats(),
     ]);
+    
+    // 检查是否有失败
+    const hasFailure = results.some(r => r.status === 'rejected');
+    
+    if (hasFailure) {
+      const newFailCount = state.failCount + 1;
+      console.log(`[Store] 刷新失败 (${newFailCount}/3)`);
+      
+      if (newFailCount >= 3) {
+        // 达到 3 次失败，停止 API
+        set({ apiStopped: true, failCount: newFailCount });
+        // 通知 API 模块
+        import('@/services/api').then(({ markApiStopped }) => {
+          markApiStopped();
+        });
+        console.warn('[Store] 连续失败 3 次，已停止 API 刷新');
+      } else {
+        set({ failCount: newFailCount });
+      }
+    } else {
+      // 成功后重置计数器
+      set({ failCount: 0 });
+    }
   },
 
   // 设置 WebSocket 连接状态
@@ -147,10 +142,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   // 重置 API 重试（手动触发）
   resetApiRetry: () => {
-    set({ apiStopped: false });
+    set({ apiStopped: false, failCount: 0 });
     // 调用 API 模块的重置函数
-    import('@/services/api').then(({ resetApiFailCount }) => {
-      resetApiFailCount();
+    import('@/services/api').then(({ resetApiStopped }) => {
+      resetApiStopped();
       console.log('[Store] API 重试计数器已重置');
     });
   },
