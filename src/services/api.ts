@@ -9,7 +9,8 @@ let USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // 失败计数器 - 防止无限重试
 let apiFailCount = 0;
-const MAX_API_FAIL_COUNT = 3; // 最大失败次数
+const MAX_API_FAIL_COUNT = 5; // 最大失败次数（因为每次刷新调用 2 次 API，实际约 2-3 轮）
+let apiStopped = false; // API 停止标志
 
 // 创建 axios 实例
 const api = axios.create({
@@ -22,13 +23,22 @@ const api = axios.create({
  */
 export function resetApiFailCount() {
   apiFailCount = 0;
+  apiStopped = false;
+  console.log('[API] 失败计数器已重置');
 }
 
 /**
  * 检查是否已达到最大失败次数
  */
 export function shouldStopRetry(): boolean {
-  return apiFailCount >= MAX_API_FAIL_COUNT;
+  return apiStopped;
+}
+
+/**
+ * 设置 API 停止状态
+ */
+export function setApiStopped(stopped: boolean) {
+  apiStopped = stopped;
 }
 
 /**
@@ -118,12 +128,12 @@ export async function getSubagents(): Promise<SubagentsListResponse> {
   
   // 检查是否已达到最大失败次数
   if (shouldStopRetry()) {
-    console.warn('[API] 已达到最大失败次数，停止请求真实数据');
+    console.warn('[API] API 已停止，返回空数据');
     return {
       total: 0,
       active: [],
       recent: [],
-      error: 'API 连续失败，已停止重试',
+      error: 'API 已停止',
     };
   }
   
@@ -138,7 +148,8 @@ export async function getSubagents(): Promise<SubagentsListResponse> {
     console.error(`[API] 真实数据请求失败 (${apiFailCount}/${MAX_API_FAIL_COUNT}):`, error);
     
     if (apiFailCount >= MAX_API_FAIL_COUNT) {
-      console.warn('[API] 连续失败 3 次，返回空数据并停止重试');
+      apiStopped = true;
+      console.warn('[API] 达到最大失败次数，已停止 API 请求');
       return {
         total: 0,
         active: [],
@@ -205,7 +216,7 @@ export async function getStats(): Promise<Stats> {
   
   // 检查是否已达到最大失败次数
   if (shouldStopRetry()) {
-    console.warn('[API] 已达到最大失败次数，停止请求统计数据');
+    console.warn('[API] API 已停止，返回空数据');
     return {
       totalAgents: 0,
       activeAgents: 0,
@@ -215,6 +226,7 @@ export async function getStats(): Promise<Stats> {
       totalRuntime: 0,
       avgRuntime: 0,
       modelUsage: {},
+      error: 'API 已停止',
     };
   }
   
@@ -229,10 +241,11 @@ export async function getStats(): Promise<Stats> {
     console.error(`[API] getStats 失败 (${apiFailCount}/${MAX_API_FAIL_COUNT}):`, error);
     
     if (apiFailCount >= MAX_API_FAIL_COUNT) {
-      console.warn('[API] 连续失败 3 次，返回空数据并停止重试');
+      apiStopped = true;
+      console.warn('[API] 达到最大失败次数，已停止 API 请求');
     }
     
-    // 失败时返回模拟数据
+    // 失败时返回模拟数据（带 error 标志）
     await new Promise(resolve => setTimeout(resolve, 200));
     return {
       totalAgents: 3,
@@ -243,6 +256,7 @@ export async function getStats(): Promise<Stats> {
       totalRuntime: 283000,
       avgRuntime: 141500,
       modelUsage: { 'qwen3.5-plus': 3 },
+      error: apiFailCount >= MAX_API_FAIL_COUNT ? 'API 连续失败，已停止重试' : undefined,
     };
   }
 }

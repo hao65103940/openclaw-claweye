@@ -93,6 +93,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     
     try {
       const stats = await getStats();
+      
+      // 检查是否返回了错误（API 停止标志）
+      if ((stats as any).error) {
+        set({
+          apiStopped: true,
+          error: 'API 连续失败，已停止重试。请检查后端服务。',
+        });
+        console.warn('[Store] API 已停止自动刷新 (from fetchStats)');
+        return;
+      }
+      
       set({ stats });
     } catch (error) {
       // 静默失败，不影响 UI 显示

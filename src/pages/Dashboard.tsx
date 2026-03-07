@@ -342,7 +342,7 @@ function Dashboard() {
                   API 已停止自动刷新
                 </p>
                 <p className="text-sm text-gray-400">
-                  🚫 后端服务不可用，已连续失败 3 次
+                  🚫 后端服务不可用，已停止重试
                 </p>
               </div>
             </div>
@@ -392,13 +392,6 @@ function Dashboard() {
               )}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* 错误提示（非 API 停止时的其他错误） */}
-      {error && !apiStopped && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
-          <p className="text-red-300 text-sm">❌ {error}</p>
         </div>
       )}
 
