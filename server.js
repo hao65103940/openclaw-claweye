@@ -357,6 +357,103 @@ app.get('/api/sessions/:sessionId/history', (req, res) => {
 });
 
 /**
+ * GET /api/agents/config/list
+ * 获取 Agent 配置列表
+ */
+app.get('/api/agents/config/list', (req, res) => {
+  try {
+    // 返回模拟的 Agent 配置列表（实际项目中可以从文件系统读取）
+    const agents = [
+      {
+        id: 'main',
+        name: '主 Agent',
+        path: '/root/.openclaw/workspace',
+        files: [
+          { name: 'SOUL.md', path: 'SOUL.md' },
+          { name: 'MEMORY.md', path: 'MEMORY.md' },
+          { name: 'USER.md', path: 'USER.md' },
+          { name: 'IDENTITY.md', path: 'IDENTITY.md' },
+        ],
+      },
+      {
+        id: 'feishu-agent',
+        name: '飞书助手',
+        path: '/root/.openclaw/workspace/agents/feishu',
+        files: [
+          { name: 'IDENTITY.md', path: 'IDENTITY.md' },
+        ],
+      },
+      {
+        id: 'wecom-agent',
+        name: '企微助手',
+        path: '/root/.openclaw/workspace/agents/wecom',
+        files: [
+          { name: 'IDENTITY.md', path: 'IDENTITY.md' },
+        ],
+      },
+    ];
+    
+    res.json({ agents });
+    console.log('[API] 返回 Agent 配置列表:', agents.length, '个');
+  } catch (error) {
+    console.error('[API] 获取 Agent 配置列表失败:', error.message);
+    res.status(500).json({ 
+      error: '获取数据失败',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/agents/config/:agentId/file/:fileName
+ * 获取 Agent 配置文件内容
+ */
+app.get('/api/agents/config/:agentId/file/:fileName', (req, res) => {
+  try {
+    const { agentId, fileName } = req.params;
+    console.log(`[API] 请求配置文件：${agentId}/${fileName}`);
+    
+    // 返回模拟内容
+    res.json({
+      file: fileName,
+      content: `# ${fileName}\n\n配置文件内容（模拟）`,
+      agentId,
+    });
+  } catch (error) {
+    console.error('[API] 获取配置文件失败:', error.message);
+    res.status(500).json({ 
+      error: '获取数据失败',
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/agents/config/:agentId/file/:fileName
+ * 保存 Agent 配置文件
+ */
+app.post('/api/agents/config/:agentId/file/:fileName', (req, res) => {
+  try {
+    const { agentId, fileName } = req.params;
+    const { content } = req.body;
+    console.log(`[API] 保存配置文件：${agentId}/${fileName}`);
+    
+    res.json({
+      success: true,
+      message: '配置已保存（模拟）',
+      agentId,
+      fileName,
+    });
+  } catch (error) {
+    console.error('[API] 保存配置文件失败:', error.message);
+    res.status(500).json({ 
+      error: '保存失败',
+      details: error.message,
+    });
+  }
+});
+
+/**
  * WebSocket 支持（Socket.io）
  * 注意：需要安装 socket.io 包
  * 当前版本不支持，前端会回退到轮询模式
