@@ -1,4 +1,4 @@
-[dotenv@17.3.1] injecting env (12) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.3.1] injecting env (12) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
 📋 已加载配置文件：config.json
 ⚙️  配置信息:
    端口：3001

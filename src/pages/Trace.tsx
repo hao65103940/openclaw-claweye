@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import RelationshipGraph from '../components/RelationshipGraph';
+import FilterPanel from '../components/FilterPanel';
 
 interface TraceNode {
   id: string;
@@ -65,6 +66,7 @@ function Trace() {
   const [selectedNode, setSelectedNode] = useState<TraceNode | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [activeTab, setActiveTab] = useState<'flow' | 'graph'>('flow');
+  const [advancedFilters, setAdvancedFilters] = useState<any>(null);
   
   // 各模块加载状态 - 独立显示
   const [loadingStates, setLoadingStates] = useState({
@@ -259,8 +261,43 @@ function Trace() {
   }
 
   const filteredFlow = flow.filter(node => {
-    if (filter === 'active') return node.isActive;
-    if (filter === 'completed') return !node.isActive;
+    // 基础状态过滤
+    if (filter === 'active' && !node.isActive) return false;
+    if (filter === 'completed' && node.isActive) return false;
+    
+    // 高级筛选
+    if (advancedFilters) {
+      // 会话类型筛选
+      if (advancedFilters.sessionTypes?.length > 0) {
+        const nodeType = node.sessionType || 'direct';
+        if (!advancedFilters.sessionTypes.includes(nodeType)) return false;
+      }
+      
+      // 状态筛选
+      if (advancedFilters.statuses?.length > 0) {
+        const nodeStatus = node.isActive ? 'running' : node.status;
+        if (!advancedFilters.statuses.includes(nodeStatus)) return false;
+      }
+      
+      // 渠道筛选
+      if (advancedFilters.channels?.length > 0) {
+        const nodeChannel = node.channel || '';
+        if (!advancedFilters.channels.includes(nodeChannel)) return false;
+      }
+      
+      // 关键词搜索
+      if (advancedFilters.keyword) {
+        const keyword = advancedFilters.keyword.toLowerCase();
+        const searchText = (
+          node.taskDescription + ' ' + 
+          node.displayName + ' ' + 
+          node.agentId + ' ' + 
+          node.key
+        ).toLowerCase();
+        if (!searchText.includes(keyword)) return false;
+      }
+    }
+    
     return true;
   });
 
@@ -358,34 +395,42 @@ function Trace() {
       )}
 
       {/* Tab 切换 + 过滤器 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-lg font-semibold text-white">🔍 执行追踪</h2>
-          <div className="flex space-x-1 bg-gray-700 rounded-lg p-1">
-            <button
-              onClick={() => setActiveTab('flow')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'flow'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              📊 执行流程
-            </button>
-            <button
-              onClick={() => setActiveTab('graph')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'graph'
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-600'
-              }`}
-            >
-              🔗 调用关系
-            </button>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <h2 className="text-lg font-semibold text-white">🔍 执行追踪</h2>
+            <div className="flex space-x-1 bg-gray-700 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('flow')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'flow'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                📊 执行流程
+              </button>
+              <button
+                onClick={() => setActiveTab('graph')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === 'graph'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                🔗 调用关系
+              </button>
+            </div>
           </div>
+          
+          {activeTab === 'flow' && (
+            <FilterPanel
+              onFilterChange={setAdvancedFilters}
+              onReset={() => setAdvancedFilters(null)}
+            />
+          )}
         </div>
         
-        {activeTab === 'flow' && (
           <div className="flex items-center space-x-2">
             <div className="flex space-x-2">
               <button
@@ -433,12 +478,14 @@ function Trace() {
         )}
       </div>
 
+      </div>
+
       {/* Tab 内容 */}
       {activeTab === 'flow' && (
         <>
           {/* 执行流程图 - 垂直时间线 */}
           <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-700 bg-gray-850 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-gray-700 bg-gray-850 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">📊 执行流程时间线</h3>
             <p className="text-sm text-gray-400 mt-1">显示最近的 Agent 会话执行记录，点击查看详情</p>
@@ -891,7 +938,7 @@ function Trace() {
       )}
         </>
       )}
-      
+
       {/* 调用关系图 Tab */}
       {activeTab === 'graph' && (
         <div>
