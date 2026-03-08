@@ -219,7 +219,9 @@ app.get('/api/sessions/list', (req, res) => {
         messageCount: 0, // OpenClaw 不提供
         agentId: s.agentId || 'main',
         model: s.model,
+        status: 'done', // 历史会话都是已完成的
         tokens: s.totalTokens || 0,
+        totalTokens: s.totalTokens || 0,
         inputTokens: s.inputTokens || 0,
         outputTokens: s.outputTokens || 0,
         contextTokens: s.contextTokens || 0,
