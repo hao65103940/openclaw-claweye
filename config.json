@@ -23,7 +23,6 @@
   },
   "github": {
     "username": "hao65103940",
-    "repository": "openclaw-claweye",
-    "tokenNote": "Token stored in .env file (GITHUB_TOKEN) - DO NOT COMMIT .env"
+    "repository": "openclaw-claweye"
   }
 }

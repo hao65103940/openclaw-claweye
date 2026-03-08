@@ -6,9 +6,10 @@ build/
 # 环境变量（包含敏感信息）
 .env
 
-# 日志文件
+# 日志文件（包含敏感信息）
 logs/
 *.log
+*.jsonl
 
 # PID 文件
 *.pid
