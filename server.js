@@ -261,7 +261,7 @@ app.get('/api/stats', (req, res) => {
       modelUsage[model] = (modelUsage[model] || 0) + 1;
     });
     
-    res.json({
+    const result = {
       totalAgents: sessions.length,
       activeAgents: activeCount,
       completedAgents: completedCount,
@@ -270,7 +270,12 @@ app.get('/api/stats', (req, res) => {
       totalRuntime,
       avgRuntime: completedCount > 0 ? totalRuntime / completedCount : 0,
       modelUsage,
-    });
+    };
+    // 更新缓存
+    statsCache = result;
+    statsCacheTime = now;
+    
+    res.json(result);
   } catch (error) {
     console.error('[API] 获取统计数据失败:', error.message);
     res.status(500).json({ 
