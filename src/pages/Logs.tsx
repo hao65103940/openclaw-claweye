@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
+import { io, Socket } from 'socket.io-client';
 
 interface LogFile {
   name: string;
@@ -20,9 +21,11 @@ function Logs() {
   const [filterText, setFilterText] = useState('');
   const [linesCount, setLinesCount] = useState(200);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [wsConnected, setWsConnected] = useState(false);
   
   const logsEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   // 加载日志文件列表
   useEffect(() => {
@@ -38,20 +41,79 @@ function Logs() {
     loadLogsList();
   }, []);
 
-  // 读取日志内容（使用 useMemo 优化）
-  const loadLogs = React.useCallback(async () => {
-    if (isPaused) return;
-    
-    setLoading(true);
-    try {
-      let response;
-      if (logSource === 'gateway') {
-        response = await api.get('/gateway-logs', {
-          params: { lines: linesCount },
-          timeout: 5000,
+  // WebSocket 连接（Gateway 日志）
+  useEffect(() => {
+    if (logSource !== 'gateway' || isPaused) {
+      // 非 Gateway 模式或暂停时，断开 WebSocket
+      if (socketRef.current) {
+        socketRef.current.emit('unsubscribe:logs');
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setWsConnected(false);
+      }
+      return;
+    }
+
+    // 建立 WebSocket 连接
+    const socket = io('http://localhost:3001', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+    });
+
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[WS] 已连接');
+      setWsConnected(true);
+      socket.emit('subscribe:gateway-logs');
+    });
+
+    socket.on('log:new', (data: { source: string; lines: string[]; isInitial: boolean }) => {
+      if (data.source === 'gateway') {
+        setLogLines(prev => {
+          if (data.isInitial) {
+            return data.lines;
+          }
+          // 追加新日志，保留最后 500 行
+          return [...prev, ...data.lines].slice(-500);
         });
-      } else {
-        response = await api.get('/logs/read', {
+        setLastFetchTime(Date.now());
+      }
+    });
+
+    socket.on('log:error', (data: { source: string; error: string }) => {
+      console.error('[WS] 日志错误:', data.error);
+      setLogLines(prev => [...prev, `❌ WebSocket 错误：${data.error}`]);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[WS] 已断开');
+      setWsConnected(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('[WS] 连接失败:', error.message);
+      setWsConnected(false);
+    });
+
+    return () => {
+      console.log('[WS] 清理连接');
+      socket.emit('unsubscribe:logs');
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [logSource, isPaused]);
+
+  // 轮询模式（文件日志）
+  useEffect(() => {
+    if (logSource !== 'file' || isPaused) return;
+
+    async function loadLogs() {
+      setLoading(true);
+      try {
+        const response = await api.get('/logs/read', {
           params: {
             file: selectedLog,
             lines: linesCount,
@@ -59,23 +121,21 @@ function Logs() {
           },
           timeout: 5000,
         });
+        
+        setLogLines(response.data.lines || []);
+        setLastFetchTime(Date.now());
+      } catch (error) {
+        console.error('加载日志失败:', error);
+        setLogLines(['❌ 加载失败：' + (error as Error).message]);
+      } finally {
+        setLoading(false);
       }
-      
-      setLogLines(response.data.lines || []);
-      setLastFetchTime(Date.now());
-    } catch (error) {
-      console.error('加载日志失败:', error);
-      setLogLines(['❌ 加载失败：' + (error as Error).message]);
-    } finally {
-      setLoading(false);
     }
-  }, [selectedLog, logSource, isPaused, filterText, linesCount]);
 
-  useEffect(() => {
     loadLogs();
-    const interval = setInterval(loadLogs, 5000); // 优化：2 秒 → 5 秒
+    const interval = setInterval(loadLogs, 5000);
     return () => clearInterval(interval);
-  }, [loadLogs]);
+  }, [selectedLog, logSource, isPaused, filterText, linesCount]);
 
   // 自动滚动到底部（只在日志容器内滚动，不影响外部页面）
   useEffect(() => {
@@ -229,8 +289,8 @@ function Logs() {
               共 {logLines.length} 行
             </span>
             {logSource === 'gateway' && (
-              <span className="text-blue-400">
-                📡 Gateway 实时日志
+              <span className={wsConnected ? 'text-green-400' : 'text-yellow-400'}>
+                {wsConnected ? '🟢 WebSocket 实时连接' : '🟡 连接中...'}
               </span>
             )}
             {logSource === 'file' && (
@@ -249,6 +309,16 @@ function Logs() {
             >
               {autoScroll ? 'ON' : 'OFF'}
             </button>
+            {logSource === 'gateway' && (
+              <>
+                <span className="ml-4">WebSocket:</span>
+                <span className={`px-2 py-0.5 text-xs rounded ${
+                  wsConnected ? 'bg-green-600' : 'bg-yellow-600'
+                }`}>
+                  {wsConnected ? 'ON' : 'OFF'}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -318,7 +388,7 @@ function Logs() {
             </>
           )}
           {logSource === 'gateway' && (
-            <li>• Gateway 日志：实时查看 OpenClaw Gateway 运行日志（openclaw logs --follow）</li>
+            <li>• Gateway 日志：WebSocket 实时推送（<100ms 延迟）</li>
           )}
           <li>• 自动滚动：默认自动滚动到最新日志，不影响外部页面滚动</li>
         </ul>

@@ -10,11 +10,13 @@
 
 import express from 'express';
 import cors from 'cors';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
+import { Server } from 'socket.io';
+import { createServer } from 'http';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1003,18 +1005,112 @@ app.get('/api/gateway-logs', async (req, res) => {
 
 /**
  * WebSocket 支持（Socket.io）
- * 注意：需要安装 socket.io 包
- * 当前版本不支持，前端会回退到轮询模式
+ * 实时日志推送
  */
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
 
-app.listen(PORT, '0.0.0.0', () => {
+// 存储活跃的日志进程
+const logProcesses = new Map();
+
+io.on('connection', (socket) => {
+  console.log('[WS] 客户端连接:', socket.id);
+  
+  // 订阅 Gateway 日志
+  socket.on('subscribe:gateway-logs', () => {
+    console.log('[WS] 客户端订阅 Gateway 日志:', socket.id);
+    
+    // 如果已有进程，直接发送缓存
+    if (gatewayLogsCache.lines.length > 0) {
+      socket.emit('log:new', {
+        source: 'gateway',
+        lines: gatewayLogsCache.lines,
+        timestamp: Date.now(),
+        isInitial: true,
+      });
+    }
+    
+    // 启动子进程流式读取日志
+    const logProcess = spawn(OPENCLAW.cliPath, ['logs', '--follow', '--plain', '--limit', '100'], {
+      env: { 
+        ...process.env, 
+        PATH: `${path.dirname(OPENCLAW.nodePath)}:${process.env.PATH}`,
+      },
+    });
+    
+    logProcesses.set(socket.id, logProcess);
+    
+    logProcess.stdout.on('data', (data) => {
+      const lines = data.toString().split('\n').filter(line => line.trim());
+      if (lines.length > 0) {
+        socket.emit('log:new', {
+          source: 'gateway',
+          lines,
+          timestamp: Date.now(),
+          isInitial: false,
+        });
+        
+        // 更新缓存
+        gatewayLogsCache.lines = [...gatewayLogsCache.lines, ...lines].slice(-500);
+        gatewayLogsCache.timestamp = Date.now();
+      }
+    });
+    
+    logProcess.stderr.on('data', (data) => {
+      console.error('[WS] 日志进程错误:', data.toString());
+    });
+    
+    logProcess.on('error', (error) => {
+      console.error('[WS] 日志进程异常:', error.message);
+      socket.emit('log:error', { 
+        source: 'gateway', 
+        error: error.message 
+      });
+    });
+    
+    logProcess.on('close', (code) => {
+      console.log('[WS] 日志进程退出:', code);
+      logProcesses.delete(socket.id);
+    });
+  });
+  
+  // 取消订阅
+  socket.on('unsubscribe:logs', () => {
+    const process = logProcesses.get(socket.id);
+    if (process) {
+      process.kill();
+      logProcesses.delete(socket.id);
+      console.log('[WS] 客户端取消订阅:', socket.id);
+    }
+  });
+  
+  // 断开连接
+  socket.on('disconnect', () => {
+    console.log('[WS] 客户端断开:', socket.id);
+    // 清理对应的进程
+    const process = logProcesses.get(socket.id);
+    if (process) {
+      process.kill();
+      logProcesses.delete(socket.id);
+    }
+  });
+});
+
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Agent 监控平台 API 服务已启动`);
   console.log(`📡 监听端口：http://0.0.0.0:${PORT}`);
+  console.log(`🔌 WebSocket 已启用 (Socket.io)`);
   console.log(`📊 可用端点:`);
   console.log(`   GET /api/subagents/list - 获取子 Agent 列表`);
   console.log(`   GET /api/sessions/list  - 获取会话列表`);
   console.log(`   GET /api/stats          - 获取统计数据`);
   console.log(`   GET /api/health         - 健康检查`);
+  console.log(`   WS /                    - WebSocket 实时日志`);
   console.log(`💡 当前使用 **真实数据** (OpenClaw CLI)`);
   console.log(`🌐 可从外部访问（需要防火墙开放端口）`);
 });
