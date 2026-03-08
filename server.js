@@ -211,6 +211,7 @@ app.get('/api/sessions/list', (req, res) => {
     
     res.json({
       sessions: sessions.map(s => ({
+        id: s.sessionId || s.key,  // 添加 id 字段，前端 Agent 类型需要
         sessionId: s.sessionId || s.key,
         sessionKey: s.key,
         label: s.key || '未知会话',
