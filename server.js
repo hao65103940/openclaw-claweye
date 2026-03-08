@@ -502,9 +502,10 @@ app.get('/api/analytics/token-trends', (req, res) => {
     res.json({
       success: true,
       sessions: sorted.map(s => ({
-        id: s.id,
+        id: s.id || s.sessionId,
         sessionId: s.sessionId,
-        label: s.label || s.task?.substring(0, 50) || '未知会话',
+        // 使用 key（sessionKey）作为 label，如 agent:main:main
+        label: s.key || s.sessionId || s.id || '未知会话',
         totalTokens: s.totalTokens || 0,
         inputTokens: s.inputTokens || 0,
         outputTokens: s.outputTokens || 0,
