@@ -223,7 +223,7 @@ export default function ChannelDetail() {
               {channel.models.length > 0 && (
                 <div className="flex items-center space-x-2 text-xs text-gray-500">
                   <span>模型:</span>
-                  {channel.models.map((m, i) => (
+                  {channel.models.map((m) => (
                     <span key={m.model} className="bg-gray-600 px-2 py-1 rounded">
                       {m.model} × {m.count}
                     </span>
