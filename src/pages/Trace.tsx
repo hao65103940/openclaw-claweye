@@ -896,9 +896,6 @@ function Trace() {
           <RelationshipGraph />
         </div>
       )}
-      
-      </>
-      )}
     </div>
   );
 }
