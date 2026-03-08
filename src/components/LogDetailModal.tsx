@@ -38,7 +38,6 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'tools' | 'messages'>('overview');
-  const [isPaused, setIsPaused] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -201,10 +200,7 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
     return entries;
   }
 
-  // 暂停/恢复自动刷新
-  function togglePause() {
-    setIsPaused(!isPaused);
-  }
+
 
   // 自动滚动到底部（初始加载和新消息到达时）
   useEffect(() => {
@@ -389,16 +385,6 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
                 最后更新：{dayjs(lastUpdateTime).format('HH:mm:ss')}
               </div>
             )}
-            <button
-              onClick={togglePause}
-              className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                isPaused 
-                  ? 'bg-green-900/30 text-green-400 border border-green-700 hover:bg-green-900/50'
-                  : 'bg-yellow-900/30 text-yellow-400 border border-yellow-700 hover:bg-yellow-900/50'
-              }`}
-            >
-              {isPaused ? '▶️ 继续' : '⏸️ 暂停'}
-            </button>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors text-2xl"
