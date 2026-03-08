@@ -142,12 +142,43 @@ function AgentTable({ agents, title, emptyMessage, onViewLog }: {
                 </td>
                 {onViewLog && (
                   <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => onViewLog(agent)}
-                      className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
-                    >
-                      📋 查看
-                    </button>
+                    <div className="flex items-center justify-center space-x-2">
+                      <button
+                        onClick={() => onViewLog(agent)}
+                        className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
+                        title="查看日志"
+                      >
+                        📋 查看
+                      </button>
+                      {agent.status === 'running' && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`确定要停止会话 "${agent.label || agent.task}" 吗？`)) {
+                              try {
+                                const response = await fetch('http://localhost:3001/api/sessions/stop', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ sessionId: agent.id }),
+                                });
+                                const result = await response.json();
+                                if (result.success) {
+                                  alert('✅ 会话已停止');
+                                } else {
+                                  alert('❌ 停止失败：' + result.error);
+                                }
+                              } catch (error) {
+                                alert('❌ 停止失败：' + error.message);
+                              }
+                            }
+                          }}
+                          className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 text-white rounded transition-colors whitespace-nowrap"
+                          title="停止会话"
+                        >
+                          ⏹️ 停止
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>
@@ -261,12 +292,43 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, onViewLog }: {
                 </td>
                 {onViewLog && (
                   <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => onViewLog(agent)}
-                      className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
-                    >
-                      📋 查看
-                    </button>
+                    <div className="flex items-center justify-center space-x-2">
+                      <button
+                        onClick={() => onViewLog(agent)}
+                        className="px-3 py-1.5 text-xs bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
+                        title="查看日志"
+                      >
+                        📋 查看
+                      </button>
+                      {agent.status === 'running' && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (confirm(`确定要停止会话 "${agent.label || agent.task}" 吗？`)) {
+                              try {
+                                const response = await fetch('http://localhost:3001/api/sessions/stop', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ sessionId: agent.id }),
+                                });
+                                const result = await response.json();
+                                if (result.success) {
+                                  alert('✅ 会话已停止');
+                                } else {
+                                  alert('❌ 停止失败：' + result.error);
+                                }
+                              } catch (error) {
+                                alert('❌ 停止失败：' + error.message);
+                              }
+                            }
+                          }}
+                          className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 text-white rounded transition-colors whitespace-nowrap"
+                          title="停止会话"
+                        >
+                          ⏹️ 停止
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

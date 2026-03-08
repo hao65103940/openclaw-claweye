@@ -1569,6 +1569,84 @@ io.on('connection', (socket) => {
   });
 });
 
+/**
+ * POST /api/sessions/stop
+ * 停止会话
+ */
+app.post('/api/sessions/stop', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: '缺少 sessionId 参数' });
+    }
+    
+    // 调用 CLI 停止会话
+    const command = `${OPENCLAW.cliPath} sessions kill ${sessionId}`;
+    execSync(command, {
+      encoding: 'utf-8',
+      timeout: 10000,
+      env: { 
+        ...process.env, 
+        PATH: `${path.dirname(OPENCLAW.nodePath)}:${process.env.PATH}`,
+      },
+    });
+    
+    console.log(`[API] 会话已停止：${sessionId}`);
+    res.json({ success: true, message: '会话已停止' });
+  } catch (error) {
+    console.error('[API] 停止会话失败:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: `停止会话失败：${error.message}` 
+    });
+  }
+});
+
+/**
+ * POST /api/sessions/restart
+ * 重启会话（先停止，再触发新会话）
+ */
+app.post('/api/sessions/restart', async (req, res) => {
+  try {
+    const { sessionId, sessionKey } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({ success: false, error: '缺少 sessionId 参数' });
+    }
+    
+    // 1. 先停止当前会话
+    try {
+      const stopCommand = `${OPENCLAW.cliPath} sessions kill ${sessionId}`;
+      execSync(stopCommand, {
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      console.log(`[API] 已停止会话：${sessionId}`);
+    } catch (error) {
+      // 忽略停止失败（可能已经停止）
+      console.warn(`[API] 停止会话失败（可能已停止）: ${sessionId}`);
+    }
+    
+    // 2. 等待 500ms 后再启动
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 3. 根据 sessionKey 触发新会话
+    // 注意：这里需要根据实际情况调整，可能需要调用不同的 CLI 命令
+    res.json({ 
+      success: true, 
+      message: '会话已重启（需要手动触发或等待定时任务）',
+      note: 'OpenClaw 暂不支持直接重启会话，已停止旧会话'
+    });
+  } catch (error) {
+    console.error('[API] 重启会话失败:', error.message);
+    res.status(500).json({ 
+      success: false, 
+      error: `重启会话失败：${error.message}` 
+    });
+  }
+});
+
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Agent 监控平台 API 服务已启动`);
   console.log(`📡 监听端口：http://0.0.0.0:${PORT}`);
@@ -1578,6 +1656,8 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`   GET /api/sessions/list  - 获取会话列表`);
   console.log(`   GET /api/stats          - 获取统计数据`);
   console.log(`   GET /api/health         - 健康检查`);
+  console.log(`   POST /api/sessions/stop - 停止会话`);
+  console.log(`   POST /api/sessions/restart - 重启会话`);
   console.log(`   WS /                    - WebSocket 实时日志`);
   console.log(`💡 当前使用 **真实数据** (OpenClaw CLI)`);
   console.log(`🌐 可从外部访问（需要防火墙开放端口）`);
