@@ -24,6 +24,7 @@
     "react-dom": "^18.2.0",
     "react-flow-renderer": "^10.3.17",
     "react-router-dom": "^6.20.0",
+    "reactflow": "^11.11.4",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "zustand": "^4.4.7"

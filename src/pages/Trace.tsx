@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
+import RelationshipGraph from '../components/RelationshipGraph';
 
 interface TraceNode {
   id: string;
@@ -63,6 +64,7 @@ function Trace() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedNode, setSelectedNode] = useState<TraceNode | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [activeTab, setActiveTab] = useState<'flow' | 'graph'>('flow');
   
   // 各模块加载状态 - 独立显示
   const [loadingStates, setLoadingStates] = useState({
@@ -355,53 +357,85 @@ function Trace() {
         </div>
       )}
 
-      {/* 过滤器 */}
-      <div className="flex items-center space-x-4">
-        <h2 className="text-lg font-semibold text-white">🔍 执行流程追踪</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1 rounded text-sm transition-colors ${
-              filter === 'all' 
-                ? 'bg-blue-700 text-white' 
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            全部 ({flow.length})
-          </button>
-          <button
-            onClick={() => setFilter('active')}
-            className={`px-3 py-1 rounded text-sm transition-colors ${
-              filter === 'active' 
-                ? 'bg-green-700 text-white' 
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            🟢 活跃 ({flow.filter(s => s.isActive).length})
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`px-3 py-1 rounded text-sm transition-colors ${
-              filter === 'completed' 
-                ? 'bg-gray-700 text-white' 
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            ✅ 已完成 ({flow.filter(s => !s.isActive).length})
-          </button>
+      {/* Tab 切换 + 过滤器 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <h2 className="text-lg font-semibold text-white">🔍 执行追踪</h2>
+          <div className="flex space-x-1 bg-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('flow')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'flow'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              📊 执行流程
+            </button>
+            <button
+              onClick={() => setActiveTab('graph')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'graph'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              🔗 调用关系
+            </button>
+          </div>
         </div>
-        <button
-          onClick={loadAllData}
-          disabled={refreshing || apiStopped}
-          className={`ml-auto px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors flex items-center space-x-2 ${
-            refreshing || apiStopped ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-        >
-          <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
-          <span>{refreshing ? '刷新中...' : apiStopped ? '已停止' : '刷新'}</span>
-        </button>
+        
+        {activeTab === 'flow' && (
+          <div className="flex items-center space-x-2">
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setFilter('all')}
+                className={`px-3 py-1 rounded text-sm transition-colors ${
+                  filter === 'all' 
+                    ? 'bg-blue-700 text-white' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                全部 ({flow.length})
+              </button>
+              <button
+                onClick={() => setFilter('active')}
+                className={`px-3 py-1 rounded text-sm transition-colors ${
+                  filter === 'active' 
+                    ? 'bg-green-700 text-white' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                🟢 活跃 ({flow.filter(s => s.isActive).length})
+              </button>
+              <button
+                onClick={() => setFilter('completed')}
+                className={`px-3 py-1 rounded text-sm transition-colors ${
+                  filter === 'completed' 
+                    ? 'bg-gray-700 text-white' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                ✅ 已完成 ({flow.filter(s => !s.isActive).length})
+              </button>
+            </div>
+            <button
+              onClick={loadAllData}
+              disabled={refreshing || apiStopped}
+              className={`ml-2 px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors flex items-center space-x-2 ${
+                refreshing || apiStopped ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
+              <span>{refreshing ? '刷新中...' : apiStopped ? '已停止' : '刷新'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Tab 内容 */}
+      {activeTab === 'flow' ? (
+        <>
       {/* 执行流程图 - 垂直时间线 */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-700 bg-gray-850 flex items-center justify-between">
@@ -854,6 +888,16 @@ function Trace() {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* 调用关系图 Tab */}
+      {activeTab === 'graph' && (
+        <div>
+          <RelationshipGraph />
+        </div>
+      )}
+      
+      </>
       )}
     </div>
   );

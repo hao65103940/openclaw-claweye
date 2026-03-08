@@ -559,6 +559,133 @@ app.get('/api/trace/subagents', (req, res) => {
 });
 
 /**
+ * GET /api/trace/relationships
+ * 调用关系图数据（React Flow 格式）
+ */
+app.get('/api/trace/relationships', (req, res) => {
+  try {
+    const sessionsData = getSessionsData();
+    const sessions = sessionsData.sessions || [];
+    
+    // 节点：主 Agent + 各类型会话
+    const nodes = [];
+    const edges = [];
+    
+    // 1. 添加主 Agent 节点
+    nodes.push({
+      id: 'main',
+      type: 'default',
+      position: { x: 0, y: 0 },
+      data: {
+        label: '主 Agent (夏娃 ✨)',
+        icon: '🤖',
+        type: 'main',
+        count: sessions.length,
+      },
+      style: {
+        background: '#3B82F6',
+        color: 'white',
+        border: '2px solid #60A5FA',
+        borderRadius: '8px',
+        padding: '12px',
+        width: '200px',
+      },
+    });
+    
+    // 2. 按类型分组统计
+    const typeGroups = {};
+    sessions.forEach(s => {
+      const key = s.key || 'unknown';
+      let type = 'direct';
+      let typeName = '直接会话';
+      let icon = '💬';
+      let color = '#6B7280';
+      
+      if (key.includes('cron')) {
+        type = 'cron';
+        typeName = '定时任务';
+        icon = '⏰';
+        color = '#F59E0B';
+      } else if (key.includes('feishu')) {
+        type = 'feishu';
+        typeName = '飞书会话';
+        icon = '📝';
+        color = '#10B981';
+      } else if (key.includes('wecom')) {
+        type = 'wecom';
+        typeName = '企微会话';
+        icon = '💼';
+        color = '#8B5CF6';
+      }
+      
+      if (!typeGroups[type]) {
+        typeGroups[type] = {
+          type,
+          typeName,
+          icon,
+          color,
+          sessions: [],
+        };
+      }
+      typeGroups[type].sessions.push(s);
+    });
+    
+    // 3. 添加类型节点和边
+    const typePositions = {
+      'feishu': { x: -200, y: 100 },
+      'wecom': { x: 0, y: 100 },
+      'cron': { x: 200, y: 100 },
+      'direct': { x: 0, y: 200 },
+    };
+    
+    Object.values(typeGroups).forEach((group, index) => {
+      const nodeId = `type:${group.type}`;
+      nodes.push({
+        id: nodeId,
+        type: 'default',
+        position: group.type === 'direct' ? 
+          { x: 0, y: 250 } : 
+          { x: (index - 1) * 220, y: 120 },
+        data: {
+          label: `${group.icon} ${group.typeName}`,
+          icon: group.icon,
+          type: group.type,
+          typeName: group.typeName,
+          count: group.sessions.length,
+          color: group.color,
+        },
+        style: {
+          background: group.color,
+          color: 'white',
+          border: '2px solid white',
+          borderRadius: '8px',
+          padding: '12px',
+          width: '200px',
+        },
+      });
+      
+      // 添加边：主 Agent → 类型节点
+      edges.push({
+        id: `edge-main-${group.type}`,
+        source: 'main',
+        target: nodeId,
+        label: `${group.sessions.length} 个会话`,
+        style: { stroke: group.color, strokeWidth: 2 },
+        animated: group.sessions.some(s => s.updatedAt > Date.now() - 5 * 60 * 1000),
+      });
+    });
+    
+    res.json({ nodes, edges });
+  } catch (error) {
+    console.error('[API] 获取调用关系失败:', error.message);
+    res.status(500).json({ 
+      error: '获取数据失败',
+      details: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/sessions/:sessionId/history
  * 获取会话历史日志（从 JSONL 文件读取）
  * 支持两种 ID 格式：
