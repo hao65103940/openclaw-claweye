@@ -69,12 +69,12 @@ let cacheTimestamp = 0;
 
 function runOpenClawCommand(command) {
   try {
-    // 使用配置的 CLI 路径
-    const cliPath = command.startsWith('openclaw') 
-      ? OPENCLAW.cliPath 
-      : `${OPENCLAW.nodePath}/${command}`;
+    // 使用配置的 CLI 路径，保持完整命令字符串
+    const fullCommand = command.startsWith('openclaw') 
+      ? `${OPENCLAW.cliPath} ${command.replace('openclaw ', '')}`
+      : `${OPENCLAW.nodePath} ${command}`;
     
-    const output = execSync(cliPath, {
+    const output = execSync(fullCommand, {
       encoding: 'utf-8',
       timeout: 15000, // 15 秒超时
       env: { 
