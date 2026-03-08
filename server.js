@@ -1156,23 +1156,35 @@ io.on('connection', (socket) => {
           
           // 消息
           if (record.type === 'message' && record.message) {
-            initialMessages.push({
+            const message = {
               role: record.message.role,
               content: record.message.content,
               timestamp: new Date(record.timestamp).getTime(),
-            });
+            };
+            initialMessages.push(message);
+            
+            // 工具调用（从 content 数组中解析 type='toolCall' 的项）
+            if (Array.isArray(record.message.content)) {
+              record.message.content.forEach((item: any) => {
+                if (item.type === 'toolCall') {
+                  initialToolCalls.push({
+                    name: item.name || item.tool,
+                    args: item.args || item.input,
+                    result: null,
+                    timestamp: new Date(record.timestamp).getTime(),
+                    status: 'success',
+                  });
+                }
+              });
+            }
           }
           
-          // 工具调用（从 toolCalls 字段或 message.toolCalls 中获取）
-          if (record.toolCalls && Array.isArray(record.toolCalls)) {
-            record.toolCalls.forEach((tool: any) => {
-              initialToolCalls.push({
-                name: tool.name || tool.tool,
-                args: tool.args || tool.input,
-                result: tool.result,
-                timestamp: new Date(record.timestamp).getTime(),
-                status: 'success',
-              });
+          // 工具结果（role='toolResult'）
+          if (record.type === 'message' && record.message.role === 'toolResult') {
+            initialMessages.push({
+              role: 'tool',
+              content: record.message.content,
+              timestamp: new Date(record.timestamp).getTime(),
             });
           }
         } catch (e) {
@@ -1207,23 +1219,35 @@ io.on('connection', (socket) => {
                     
                     // 消息
                     if (record.type === 'message' && record.message) {
-                      newMessages.push({
+                      const message = {
                         role: record.message.role,
                         content: record.message.content,
                         timestamp: new Date(record.timestamp).getTime(),
-                      });
+                      };
+                      newMessages.push(message);
+                      
+                      // 工具调用（从 content 数组中解析）
+                      if (Array.isArray(record.message.content)) {
+                        record.message.content.forEach((item: any) => {
+                          if (item.type === 'toolCall') {
+                            newToolCalls.push({
+                              name: item.name || item.tool,
+                              args: item.args || item.input,
+                              result: null,
+                              timestamp: new Date(record.timestamp).getTime(),
+                              status: 'success',
+                            });
+                          }
+                        });
+                      }
                     }
                     
-                    // 工具调用
-                    if (record.toolCalls && Array.isArray(record.toolCalls)) {
-                      record.toolCalls.forEach((tool: any) => {
-                        newToolCalls.push({
-                          name: tool.name || tool.tool,
-                          args: tool.args || tool.input,
-                          result: tool.result,
-                          timestamp: new Date(record.timestamp).getTime(),
-                          status: 'success',
-                        });
+                    // 工具结果
+                    if (record.type === 'message' && record.message.role === 'toolResult') {
+                      newMessages.push({
+                        role: 'tool',
+                        content: record.message.content,
+                        timestamp: new Date(record.timestamp).getTime(),
                       });
                     }
                   } catch (e) {

@@ -30,3 +30,45 @@
 [WS] 客户端断开: j5hr2QflnqCDsumjAAAF
 [WS] 客户端连接: _V9OWrlVrMW0mdMHAAAH
 [WS] 客户端订阅会话历史: agent:main:main _V9OWrlVrMW0mdMHAAAH
+[WS] 客户端取消订阅会话历史: agent:main:main
+[WS] 客户端断开: _V9OWrlVrMW0mdMHAAAH
+[WS] 客户端连接: nnkCGJ0F8iN8X3VZAAAJ
+[WS] 客户端订阅会话历史: agent:main:main nnkCGJ0F8iN8X3VZAAAJ
+[WS] 客户端取消订阅会话历史: agent:main:main
+[WS] 客户端断开: nnkCGJ0F8iN8X3VZAAAJ
+[WS] 客户端连接: maLlaCYr1wQxbQE6AAAL
+[WS] 客户端订阅会话历史: agent:main:main maLlaCYr1wQxbQE6AAAL
+[WS] 客户端取消订阅会话历史: agent:main:main
+[WS] 客户端断开: maLlaCYr1wQxbQE6AAAL
+[WS] 客户端连接: c-0TT6BxmUanjCAMAAAN
+[WS] 客户端订阅 Gateway 日志: c-0TT6BxmUanjCAMAAAN
+[WS] 日志进程错误: Log tail truncated (increase --max-bytes).
+
+[WS] 客户端取消订阅: c-0TT6BxmUanjCAMAAAN
+[WS] 客户端断开: c-0TT6BxmUanjCAMAAAN
+[WS] 日志进程退出: 1
+[API] 返回配置列表 - Agents: 7 Workspace: 26 Skills: 12
+[API] 返回配置列表 - Agents: 7 Workspace: 26 Skills: 12
+[WS] 客户端连接: GYqu_yx9zCgf8L02AAAP
+[WS] 客户端订阅会话历史: agent:main:cron:docker-proxy-reminder-0305 GYqu_yx9zCgf8L02AAAP
+[WS] 客户端取消订阅会话历史: agent:main:cron:docker-proxy-reminder-0305
+[WS] 客户端断开: GYqu_yx9zCgf8L02AAAP
+[WS] 客户端连接: CuyXAFjpxpU30HYVAAAR
+[WS] 客户端订阅会话历史: agent:main:main CuyXAFjpxpU30HYVAAAR
+[WS] 客户端取消订阅会话历史: agent:main:main
+[WS] 客户端断开: CuyXAFjpxpU30HYVAAAR
+[WS] 客户端连接: dTtUuN5rkKU6v-L6AAAT
+[WS] 客户端订阅会话历史: agent:main:cron:7c450201-d3c4-41bf-bd2b-9e2955cb7b3f dTtUuN5rkKU6v-L6AAAT
+[WS] 客户端断开: dTtUuN5rkKU6v-L6AAAT
+[WS] 客户端连接: 9KWur8-f73ua6dakAAAV
+[WS] 客户端订阅会话历史: agent:main:cron:7c450201-d3c4-41bf-bd2b-9e2955cb7b3f 9KWur8-f73ua6dakAAAV
+[WS] 客户端取消订阅会话历史: agent:main:cron:7c450201-d3c4-41bf-bd2b-9e2955cb7b3f
+[WS] 客户端断开: 9KWur8-f73ua6dakAAAV
+[WS] 客户端连接: OMX6VPg4TsbnNoR6AAAX
+[WS] 客户端订阅会话历史: agent:main:main OMX6VPg4TsbnNoR6AAAX
+[API] 请求会话历史：agent:main:main
+[API] 返回会话历史：1039 条消息，516 个工具调用
+[WS] 客户端取消订阅会话历史: agent:main:main
+[WS] 客户端断开: OMX6VPg4TsbnNoR6AAAX
+[API] 返回配置列表 - Agents: 7 Workspace: 26 Skills: 12
+[API] 返回配置列表 - Agents: 7 Workspace: 26 Skills: 12

@@ -91,9 +91,6 @@ function AgentTable({ agents, title, emptyMessage, onViewLog }: {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 模型
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                时间
-              </th>
               {onViewLog && (
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
                   操作
@@ -129,16 +126,6 @@ function AgentTable({ agents, title, emptyMessage, onViewLog }: {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-400">
                   {agent.model || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-400">
-                  {agent.startedAt ? (
-                    <div>
-                      <div>{dayjs(agent.startedAt).format('HH:mm:ss')}</div>
-                      <div className="text-xs text-gray-500">{dayjs(agent.startedAt).fromNow()}</div>
-                    </div>
-                  ) : (
-                    '-'
-                  )}
                 </td>
                 {onViewLog && (
                   <td className="px-6 py-4 text-center">
@@ -210,9 +197,6 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, onViewLog }: {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 模型
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                时间
-              </th>
               {onViewLog && (
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
                   操作
@@ -222,7 +206,7 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, onViewLog }: {
           </thead>
           <tbody className="bg-gray-800 divide-y divide-gray-700">
             {currentAgents.map((agent, index) => (
-              <tr key={`${agent.id}-${index}-${agent.startedAt || Date.now()}`} className="hover:bg-gray-750 transition-colors">
+              <tr key={`${agent.id}-${index}-${agent.updatedAt || Date.now()}`} className="hover:bg-gray-750 transition-colors">
                 <td className="px-6 py-4">
                   <div className="max-w-md">
                     <div className="text-sm text-white font-medium mb-1 truncate" title={agent.label || '未命名任务'}>
@@ -248,16 +232,6 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, onViewLog }: {
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-400">
                   {agent.model || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-400">
-                  {agent.startedAt ? (
-                    <div>
-                      <div>{dayjs(agent.startedAt).format('HH:mm:ss')}</div>
-                      <div className="text-xs text-gray-500">{dayjs(agent.startedAt).fromNow()}</div>
-                    </div>
-                  ) : (
-                    '-'
-                  )}
                 </td>
                 {onViewLog && (
                   <td className="px-6 py-4 text-center">
@@ -320,7 +294,6 @@ function Dashboard() {
   useEffect(() => {
     refreshAll();
     const interval = setInterval(() => {
-      // 如果 API 已停止，不再自动刷新
       if (!apiStopped) {
         refreshAll();
       }
@@ -440,18 +413,18 @@ function Dashboard() {
         />
       </div>
 
-      {/* 活跃 Agent */}
+      {/* 活跃会话 */}
       <AgentTable 
         agents={activeAgents || []} 
-        title="🟢 活跃 Agent" 
-        emptyMessage="当前没有正在运行的 Agent"
+        title="🟢 活跃会话" 
+        emptyMessage="当前没有正在运行的会话"
         onViewLog={setSelectedAgent}
       />
 
-      {/* 最近完成 - 分页展示 */}
+      {/* 最近完成的会话 - 分页展示（默认 10 条） */}
       <PaginatedAgentTable 
         agents={recentAgents || []} 
-        title="✅ 最近完成" 
+        title="✅ 最近完成的会话" 
         pageSize={10}
         onViewLog={setSelectedAgent}
       />
