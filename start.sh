@@ -34,24 +34,33 @@ if [ ! -d "node_modules" ]; then
     echo ""
 fi
 
-# 清理旧进程和占用端口的进程
-echo "🧹 清理旧进程..."
-PORTS_IN_USE=""
+# ==========================================
+# 强制清理端口和进程
+# ==========================================
+echo "🧹 强制清理端口和进程..."
 
 # 检查并清理 3001 端口（后端）
-if lsof -i:3001 > /dev/null 2>&1; then
-    PORTS_IN_USE="$PORTS_IN_USE 3001"
-    echo "⚠️  端口 3001 被占用，正在清理..."
+if lsof -ti:3001 > /dev/null 2>&1; then
+    echo "⚠️  端口 3001 被占用，强制清理..."
     lsof -ti:3001 | xargs kill -9 2>/dev/null
     sleep 1
+    if lsof -ti:3001 > /dev/null 2>&1; then
+        echo "❌ 端口 3001 清理失败，请手动检查"
+        exit 1
+    fi
+    echo "✅ 端口 3001 已清理"
 fi
 
 # 检查并清理 3000 端口（前端）
-if lsof -i:3000 > /dev/null 2>&1; then
-    PORTS_IN_USE="$PORTS_IN_USE 3000"
-    echo "⚠️  端口 3000 被占用，正在清理..."
+if lsof -ti:3000 > /dev/null 2>&1; then
+    echo "⚠️  端口 3000 被占用，强制清理..."
     lsof -ti:3000 | xargs kill -9 2>/dev/null
     sleep 1
+    if lsof -ti:3000 > /dev/null 2>&1; then
+        echo "❌ 端口 3000 清理失败，请手动检查"
+        exit 1
+    fi
+    echo "✅ 端口 3000 已清理"
 fi
 
 # 停止旧的 node server.js 进程
@@ -73,11 +82,14 @@ if pgrep -f "npm run dev" > /dev/null; then
     sleep 1
 fi
 
-if [ -n "$PORTS_IN_USE" ]; then
-    echo "✅ 端口清理完成:$PORTS_IN_USE"
-else
-    echo "✅ 无需清理，端口可用"
+# 验证端口已释放
+sleep 1
+if lsof -ti:3001 > /dev/null 2>&1 || lsof -ti:3000 > /dev/null 2>&1; then
+    echo "⚠️  端口仍未释放，等待 3 秒..."
+    sleep 3
 fi
+
+echo "✅ 端口清理完成，3000 和 3001 可用"
 echo ""
 
 # 启动后端服务

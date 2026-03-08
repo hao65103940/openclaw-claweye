@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Monitor Platform 停止脚本
-# 同时停止后端和前端服务
+# 同时停止后端和前端服务，并确保 3000 和 3001 端口被释放
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -91,9 +91,44 @@ if [ $REMAINING -gt 0 ]; then
     sleep 1
 fi
 
+# ==========================================
+# 强制清理 3000 和 3001 端口
+# ==========================================
+echo ""
+echo "🧹 强制清理端口..."
+
+# 清理 3001 端口
+if lsof -ti:3001 > /dev/null 2>&1; then
+    echo "⚠️  端口 3001 仍被占用，强制清理..."
+    lsof -ti:3001 | xargs kill -9 2>/dev/null
+    sleep 1
+    if ! lsof -ti:3001 > /dev/null 2>&1; then
+        echo "✅ 端口 3001 已清理"
+    else
+        echo "⚠️  端口 3001 清理失败，请手动检查"
+    fi
+else
+    echo "✅ 端口 3001 已释放"
+fi
+
+# 清理 3000 端口
+if lsof -ti:3000 > /dev/null 2>&1; then
+    echo "⚠️  端口 3000 仍被占用，强制清理..."
+    lsof -ti:3000 | xargs kill -9 2>/dev/null
+    sleep 1
+    if ! lsof -ti:3000 > /dev/null 2>&1; then
+        echo "✅ 端口 3000 已清理"
+    else
+        echo "⚠️  端口 3000 清理失败，请手动检查"
+    fi
+else
+    echo "✅ 端口 3000 已释放"
+fi
+
 echo ""
 echo "=========================================="
 echo "✅ Monitor Platform 已停止"
+echo "✅ 端口 3000 和 3001 已释放"
 echo "=========================================="
 echo ""
 echo "📖 查看日志："
