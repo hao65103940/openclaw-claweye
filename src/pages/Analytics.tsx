@@ -4,6 +4,9 @@ import CostEstimate from '../components/CostEstimate';
 import SessionLifecycle from '../components/SessionLifecycle';
 import SessionTypes from '../components/SessionTypes';
 import FailureAnalysis from '../components/FailureAnalysis';
+import ModelStats from '../components/ModelStats';
+import PerformanceBottleneck from '../components/PerformanceBottleneck';
+import ToolUsage from '../components/ToolUsage';
 
 function Analytics() {
   return (
@@ -24,6 +27,14 @@ function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SessionTypes />
         <FailureAnalysis />
+      </div>
+
+      {/* 阶段 3：模型与性能分析 */}
+      <ModelStats />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PerformanceBottleneck />
+        <ToolUsage />
       </div>
     </div>
   );

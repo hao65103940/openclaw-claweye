@@ -831,6 +831,113 @@ app.get('/api/analytics/failure-analysis', (req, res) => {
 });
 
 /**
+ * GET /api/analytics/model-stats
+ * 模型使用统计
+ */
+app.get('/api/analytics/model-stats', (req, res) => {
+  try {
+    const sessionsData = getSessionsData();
+    const sessions = sessionsData.sessions || [];
+    
+    const modelMap = new Map();
+    sessions.forEach(s => {
+      const model = s.model || 'unknown';
+      if (!modelMap.has(model)) {
+        modelMap.set(model, { model, count: 0, totalTokens: 0, inputTokens: 0, outputTokens: 0 });
+      }
+      const data = modelMap.get(model);
+      data.count += 1;
+      data.totalTokens += s.totalTokens || 0;
+      data.inputTokens += s.inputTokens || 0;
+      data.outputTokens += s.outputTokens || 0;
+    });
+    
+    const models = Array.from(modelMap.values())
+      .sort((a, b) => b.count - a.count);
+    
+    res.json({
+      success: true,
+      models,
+      totalSessions: sessions.length,
+    });
+  } catch (error) {
+    console.error('模型统计 API 错误:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/performance-bottleneck
+ * 性能瓶颈分析
+ */
+app.get('/api/analytics/performance-bottleneck', (req, res) => {
+  try {
+    const sessionsData = getSessionsData();
+    const sessions = sessionsData.sessions || [];
+    
+    // 按耗时排序
+    const sortedByRuntime = [...sessions]
+      .filter(s => s.runtimeMs > 0)
+      .sort((a, b) => (b.runtimeMs || 0) - (a.runtimeMs || 0));
+    
+    // 计算百分位数
+    const runtimes = sessions.map(s => s.runtimeMs || 0).sort((a, b) => a - b);
+    const p50 = runtimes.length > 0 ? runtimes[Math.floor(runtimes.length * 0.5)] : 0;
+    const p90 = runtimes.length > 0 ? runtimes[Math.floor(runtimes.length * 0.9)] : 0;
+    const p99 = runtimes.length > 0 ? runtimes[Math.floor(runtimes.length * 0.99)] : 0;
+    
+    res.json({
+      success: true,
+      slowestSessions: sortedByRuntime.slice(0, 10).map(s => ({
+        id: s.id,
+        label: s.key || s.sessionId || '未知',
+        runtimeMs: s.runtimeMs || 0,
+        totalTokens: s.totalTokens || 0,
+      })),
+      percentiles: { p50, p90, p99 },
+      avgRuntime: sessions.length > 0
+        ? Math.round(sessions.reduce((sum, s) => sum + (s.runtimeMs || 0), 0) / sessions.length)
+        : 0,
+    });
+  } catch (error) {
+    console.error('性能瓶颈 API 错误:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/analytics/tool-usage
+ * 工具调用分析
+ */
+app.get('/api/analytics/tool-usage', (req, res) => {
+  try {
+    const sessionsData = getSessionsData();
+    const sessions = sessionsData.sessions || [];
+    
+    // 注：这里简化实现，实际需要从 JSONL 中解析工具调用
+    // 暂时返回空数据，后续优化
+    res.json({
+      success: true,
+      tools: [],
+      totalCalls: 0,
+      note: '工具调用统计需要从 JSONL 文件解析，后续实现',
+    });
+  } catch (error) {
+    console.error('工具调用 API 错误:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/analytics/channels
  * 渠道统计
  */
