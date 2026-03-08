@@ -9,20 +9,22 @@
   "server": {
     "port": 3001,
     "host": "0.0.0.0",
-    "cacheTTL": 5000,
-    "logPath": "/root/.openclaw/claweye/logs"
-  },
-  "frontend": {
-    "devPort": 3000,
-    "apiBaseUrl": "http://localhost:3001/api"
+    "cacheTTL": 20000,
+    "logPath": "/root/.openclaw/claweye/logs",
+    "logLevel": "info"
   },
   "security": {
-    "allowedBasePaths": [
-      "/root/.openclaw"
-    ]
+    "allowedBasePaths": "/root/.openclaw"
   },
-  "github": {
-    "username": "hao65103940",
-    "repository": "openclaw-claweye"
+  "ui": {
+    "agentIcons": {
+      "main": { "icon": "👁️", "name": "雅典娜", "group": "AI 军团" },
+      "feishu-agent": { "icon": "📝", "name": "赫尔墨斯", "group": "渠道 Agent" },
+      "wecom-agent": { "icon": "💼", "name": "赫尔墨斯", "group": "渠道 Agent" },
+      "coding-agent": { "icon": "💻", "name": "赫菲斯托斯", "group": "工具 Agent" },
+      "design-agent": { "icon": "🎨", "name": "阿波罗", "group": "工具 Agent" },
+      "review-agent": { "icon": "🔍", "name": "阿努比斯", "group": "工具 Agent" },
+      "requirement-agent": { "icon": "📋", "name": "缪斯", "group": "工具 Agent" }
+    }
   }
 }

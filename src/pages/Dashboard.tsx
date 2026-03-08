@@ -9,6 +9,59 @@ import LogDetailModal from '../components/LogDetailModal';
 import TokenTrend from '../components/TokenTrend';
 import { io, Socket } from 'socket.io-client';
 
+// Agent 图标和分组映射（希腊神话）
+const AGENT_CONFIG: Record<string, { icon: string; name: string; group: string }> = {
+  'main': { icon: '👁️', name: '雅典娜', group: 'AI 军团' },
+  'feishu-agent': { icon: '📝', name: '赫尔墨斯', group: '渠道 Agent' },
+  'wecom-agent': { icon: '💼', name: '赫尔墨斯', group: '渠道 Agent' },
+  'coding-agent': { icon: '💻', name: '赫菲斯托斯', group: '工具 Agent' },
+  'design-agent': { icon: '🎨', name: '阿波罗', group: '工具 Agent' },
+  'review-agent': { icon: '🔍', name: '阿努比斯', group: '工具 Agent' },
+  'requirement-agent': { icon: '📋', name: '缪斯', group: '工具 Agent' },
+};
+
+// 获取 Agent 显示名称
+function getAgentDisplayName(agent: Agent) {
+  const agentId = agent.agentId || 'unknown';
+  const config = AGENT_CONFIG[agentId] || { icon: '🤖', name: 'Agent', group: '其他' };
+  return `${config.icon} ${config.name}`;
+}
+
+// 按分组排序 Agent
+function groupAgentsByType(agents: Agent[]) {
+  const groups: Record<string, Agent[]> = {};
+  
+  agents.forEach(agent => {
+    const agentId = agent.agentId || 'unknown';
+    const config = AGENT_CONFIG[agentId] || { group: '其他' };
+    const groupName = config.group;
+    
+    if (!groups[groupName]) {
+      groups[groupName] = [];
+    }
+    groups[groupName].push(agent);
+  });
+  
+  // 按分组名称排序（AI 军团优先）
+  const sortedGroups: Record<string, Agent[]> = {};
+  const groupOrder = ['AI 军团', '渠道 Agent', '工具 Agent', '其他'];
+  
+  groupOrder.forEach(group => {
+    if (groups[group]) {
+      sortedGroups[group] = groups[group];
+    }
+  });
+  
+  // 添加剩余分组
+  Object.keys(groups).forEach(group => {
+    if (!sortedGroups[group]) {
+      sortedGroups[group] = groups[group];
+    }
+  });
+  
+  return sortedGroups;
+}
+
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -227,15 +280,23 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, emptyMessage, onVie
             </tr>
           </thead>
           <tbody className="bg-gray-800 divide-y divide-gray-700">
-            {currentAgents.map((agent, index) => (
+            {currentAgents.map((agent, index) => {
+              const agentConfig = AGENT_CONFIG[agent.agentId || ''] || { icon: '🤖', name: 'Agent', group: '其他' };
+              return (
               <tr key={`${agent.id}-${index}-${agent.updatedAt || Date.now()}`} className="hover:bg-gray-750 transition-colors">
                 <td className="px-6 py-4">
-                  <div className="max-w-md">
-                    <div className="text-sm text-white font-medium mb-1 truncate" title={agent.label || '未命名任务'}>
-                      {agent.label || '未命名任务'}
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="text-2xl" title={`${agentConfig.name} (${agentConfig.group})`}>{agentConfig.icon}</div>
+                      <div className="text-xs text-gray-500 text-center mt-1">{agentConfig.group}</div>
                     </div>
-                    <div className="text-xs text-gray-400 truncate" title={agent.task}>
-                      {(agent.task || '').substring(0, 80)}{agent.task && agent.task.length > 80 ? '...' : ''}
+                    <div className="flex-1 min-w-0 max-w-md">
+                      <div className="text-sm text-white font-medium mb-1 truncate" title={agent.label || '未命名任务'}>
+                        {agent.label || '未命名任务'}
+                      </div>
+                      <div className="text-xs text-gray-400 truncate" title={agent.task}>
+                        {(agent.task || '').substring(0, 80)}{agent.task && agent.task.length > 80 ? '...' : ''}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -279,7 +340,7 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, emptyMessage, onVie
                   </td>
                 )}
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
