@@ -1571,7 +1571,8 @@ io.on('connection', (socket) => {
 
 /**
  * POST /api/sessions/stop
- * 停止会话
+ * 停止会话（提示用户手动操作）
+ * 注意：OpenClaw CLI 没有直接的 stop/kill 命令
  */
 app.post('/api/sessions/stop', async (req, res) => {
   try {
@@ -1581,68 +1582,25 @@ app.post('/api/sessions/stop', async (req, res) => {
       return res.status(400).json({ success: false, error: '缺少 sessionId 参数' });
     }
     
-    // 调用 CLI 停止会话
-    const command = `${OPENCLAW.cliPath} sessions kill ${sessionId}`;
-    execSync(command, {
-      encoding: 'utf-8',
-      timeout: 10000,
-      env: { 
-        ...process.env, 
-        PATH: `${path.dirname(OPENCLAW.nodePath)}:${process.env.PATH}`,
-      },
+    // OpenClaw 没有直接的 stop 命令，返回提示信息
+    res.json({ 
+      success: false, 
+      error: 'OpenClaw CLI 暂不支持直接停止会话',
+      manualSteps: [
+        '1. 打开终端',
+        `2. 运行：openclaw sessions --json`,
+        '3. 找到对应的会话记录',
+        '4. 手动删除 sessions.json 中的记录（如果需要）',
+        '',
+        '或者等待会话自然完成'
+      ],
+      note: '会话管理功能将在未来版本中支持'
     });
-    
-    console.log(`[API] 会话已停止：${sessionId}`);
-    res.json({ success: true, message: '会话已停止' });
   } catch (error) {
     console.error('[API] 停止会话失败:', error.message);
     res.status(500).json({ 
       success: false, 
       error: `停止会话失败：${error.message}` 
-    });
-  }
-});
-
-/**
- * POST /api/sessions/restart
- * 重启会话（先停止，再触发新会话）
- */
-app.post('/api/sessions/restart', async (req, res) => {
-  try {
-    const { sessionId, sessionKey } = req.body;
-    
-    if (!sessionId) {
-      return res.status(400).json({ success: false, error: '缺少 sessionId 参数' });
-    }
-    
-    // 1. 先停止当前会话
-    try {
-      const stopCommand = `${OPENCLAW.cliPath} sessions kill ${sessionId}`;
-      execSync(stopCommand, {
-        encoding: 'utf-8',
-        timeout: 10000,
-      });
-      console.log(`[API] 已停止会话：${sessionId}`);
-    } catch (error) {
-      // 忽略停止失败（可能已经停止）
-      console.warn(`[API] 停止会话失败（可能已停止）: ${sessionId}`);
-    }
-    
-    // 2. 等待 500ms 后再启动
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // 3. 根据 sessionKey 触发新会话
-    // 注意：这里需要根据实际情况调整，可能需要调用不同的 CLI 命令
-    res.json({ 
-      success: true, 
-      message: '会话已重启（需要手动触发或等待定时任务）',
-      note: 'OpenClaw 暂不支持直接重启会话，已停止旧会话'
-    });
-  } catch (error) {
-    console.error('[API] 重启会话失败:', error.message);
-    res.status(500).json({ 
-      success: false, 
-      error: `重启会话失败：${error.message}` 
     });
   }
 });

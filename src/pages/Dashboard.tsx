@@ -154,26 +154,10 @@ function AgentTable({ agents, title, emptyMessage, onViewLog }: {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (confirm(`确定要停止会话 "${agent.label || agent.task}" 吗？`)) {
-                              try {
-                                const response = await fetch('http://localhost:3001/api/sessions/stop', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ sessionId: agent.id }),
-                                });
-                                const result = await response.json();
-                                if (result.success) {
-                                  alert('✅ 会话已停止');
-                                } else {
-                                  alert('❌ 停止失败：' + result.error);
-                                }
-                              } catch (error) {
-                                alert('❌ 停止失败：' + error.message);
-                              }
-                            }
+                            alert('💡 提示：\n\nOpenClaw CLI 暂不支持直接停止会话。\n\n会话会在完成任务后自动结束，\n或者等待定时任务自然完成。\n\n未来版本将支持会话管理功能。');
                           }}
-                          className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 text-white rounded transition-colors whitespace-nowrap"
-                          title="停止会话"
+                          className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors whitespace-nowrap"
+                          title="停止会话（暂不支持）"
                         >
                           ⏹️ 停止
                         </button>
@@ -304,26 +288,10 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, onViewLog }: {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            if (confirm(`确定要停止会话 "${agent.label || agent.task}" 吗？`)) {
-                              try {
-                                const response = await fetch('http://localhost:3001/api/sessions/stop', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ sessionId: agent.id }),
-                                });
-                                const result = await response.json();
-                                if (result.success) {
-                                  alert('✅ 会话已停止');
-                                } else {
-                                  alert('❌ 停止失败：' + result.error);
-                                }
-                              } catch (error) {
-                                alert('❌ 停止失败：' + error.message);
-                              }
-                            }
+                            alert('💡 提示：\n\nOpenClaw CLI 暂不支持直接停止会话。\n\n会话会在完成任务后自动结束，\n或者等待定时任务自然完成。\n\n未来版本将支持会话管理功能。');
                           }}
-                          className="px-3 py-1.5 text-xs bg-red-700 hover:bg-red-600 text-white rounded transition-colors whitespace-nowrap"
-                          title="停止会话"
+                          className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors whitespace-nowrap"
+                          title="停止会话（暂不支持）"
                         >
                           ⏹️ 停止
                         </button>
