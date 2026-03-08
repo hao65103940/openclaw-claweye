@@ -38,3 +38,4 @@ error: too many arguments for 'sessions'. Expected 0 arguments but got 2.
 [WS] 客户端断开: i4GBnZnXAek_In_zAAAH
 [WS] 客户端连接: y27D2QwJ6qGNBV0IAAAJ
 [WS] 客户端订阅会话历史: agent:main:main y27D2QwJ6qGNBV0IAAAJ
+[WS] 客户端断开: y27D2QwJ6qGNBV0IAAAJ

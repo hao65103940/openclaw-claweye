@@ -11,6 +11,7 @@ export interface Agent {
   totalTokens?: number;
   inputTokens?: number;
   outputTokens?: number;
+  contextTokens?: number;
   startedAt: number;
   endedAt?: number;
   createdAt: number;

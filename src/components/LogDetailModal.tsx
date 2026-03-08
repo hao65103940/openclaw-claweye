@@ -37,7 +37,7 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'logs' | 'tools' | 'messages'>('logs');
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'tools' | 'messages'>('overview');
   const [isPaused, setIsPaused] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
@@ -439,6 +439,16 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
         {/* Tab 切换 */}
         <div className="px-6 py-3 border-b border-gray-700 bg-gray-800 flex items-center space-x-4">
           <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-3 py-1.5 rounded text-sm transition-colors ${
+              activeTab === 'overview' 
+                ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-700' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            📊 概览
+          </button>
+          <button
             onClick={() => setActiveTab('logs')}
             className={`px-3 py-1.5 rounded text-sm transition-colors ${
               activeTab === 'logs' 
@@ -476,6 +486,182 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
             <div className="text-center py-12 text-gray-400">
               <div className="animate-spin text-2xl mb-2">🔄</div>
               <div>正在加载日志...</div>
+            </div>
+          ) : activeTab === 'overview' ? (
+            <div className="space-y-6">
+              {/* Token 分布 */}
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h3 className="text-lg font-semibold mb-4 text-white flex items-center">
+                  <span className="text-xl mr-2">📊</span>
+                  Token 分布
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-400">输入 Token</span>
+                      <span className="text-blue-400 font-mono">
+                        {agent.inputTokens ? (agent.inputTokens / 1000).toFixed(1) + 'k' : '-'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (agent.inputTokens || 0) / ((agent.totalTokens || 1) * 0.8) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-400">输出 Token</span>
+                      <span className="text-green-400 font-mono">
+                        {agent.outputTokens ? (agent.outputTokens / 1000).toFixed(1) + 'k' : '-'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-green-600 h-2 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (agent.outputTokens || 0) / ((agent.totalTokens || 1) * 0.3) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-400">上下文 Token</span>
+                      <span className="text-purple-400 font-mono">
+                        {agent.contextTokens ? (agent.contextTokens / 1000).toFixed(1) + 'k' : '-'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (agent.contextTokens || 0) / 128000 * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-gray-700">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">总计</span>
+                      <span className="text-yellow-400 font-mono font-bold">
+                        {agent.totalTokens ? (agent.totalTokens / 1000).toFixed(1) + 'k' : '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 时间线 */}
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h3 className="text-lg font-semibold mb-4 text-white flex items-center">
+                  <span className="text-xl mr-2">⏱️</span>
+                  时间线
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">开始时间</span>
+                    <span className="text-white font-mono">
+                      {agent.startedAt ? dayjs(agent.startedAt).format('MM-DD HH:mm:ss') : '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">结束时间</span>
+                    <span className="text-white font-mono">
+                      {agent.endedAt ? dayjs(agent.endedAt).format('MM-DD HH:mm:ss') : '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">总耗时</span>
+                    <span className="text-blue-400 font-mono font-bold">
+                      {agent.runtime || '-'}
+                    </span>
+                  </div>
+                  {agent.runtimeMs && (
+                    <div className="pt-3 border-t border-gray-700">
+                      <div className="text-xs text-gray-500">
+                        相对时间：{dayjs(agent.startedAt).fromNow()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 工具调用统计 */}
+              {toolCalls.length > 0 && (
+                <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                  <h3 className="text-lg font-semibold mb-4 text-white flex items-center">
+                    <span className="text-xl mr-2">🔧</span>
+                    工具调用统计
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-700 rounded-lg p-3">
+                      <div className="text-xs text-gray-400 mb-1">总调用次数</div>
+                      <div className="text-2xl font-bold text-white">{toolCalls.length}</div>
+                    </div>
+                    <div className="bg-gray-700 rounded-lg p-3">
+                      <div className="text-xs text-gray-400 mb-1">成功率</div>
+                      <div className="text-2xl font-bold text-green-400">
+                        {Math.round((toolCalls.filter(t => t.status === 'success').length / toolCalls.length) * 100)}%
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                    {toolCalls.slice(0, 10).map((tool, index) => (
+                      <div key={index} className="flex items-center justify-between text-xs p-2 bg-gray-700 rounded">
+                        <span className="text-blue-400 font-mono">{tool.name}</span>
+                        <span className="text-gray-500">{dayjs(tool.timestamp).format('HH:mm:ss')}</span>
+                        <span className={`px-2 py-0.5 rounded ${
+                          tool.status === 'success' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                        }`}>
+                          {tool.status === 'success' ? '✅' : '❌'}
+                        </span>
+                      </div>
+                    ))}
+                    {toolCalls.length > 10 && (
+                      <div className="text-xs text-gray-500 text-center py-2">
+                        还有 {toolCalls.length - 10} 条... 切换到"工具调用"Tab 查看全部
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 任务描述 */}
+              {agent.task && (
+                <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                  <h3 className="text-lg font-semibold mb-3 text-white flex items-center">
+                    <span className="text-xl mr-2">📝</span>
+                    任务描述
+                  </h3>
+                  <div className="text-sm text-gray-300 whitespace-pre-wrap break-all leading-relaxed">
+                    {agent.task}
+                  </div>
+                </div>
+              )}
+
+              {/* 其他信息 */}
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <h3 className="text-lg font-semibold mb-4 text-white flex items-center">
+                  <span className="text-xl mr-2">ℹ️</span>
+                  会话信息
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">会话 ID</span>
+                    <div className="text-white font-mono text-xs mt-1 break-all">{agent.id}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">模型</span>
+                    <div className="text-white font-mono text-xs mt-1">{agent.model || '-'}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">状态</span>
+                    <div className="text-white font-mono text-xs mt-1 capitalize">{agent.status}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">消息数</span>
+                    <div className="text-white font-mono text-xs mt-1">{logs.length}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : activeTab === 'logs' ? (
             <div className="space-y-2">
