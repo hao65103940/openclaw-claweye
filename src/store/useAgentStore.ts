@@ -21,6 +21,7 @@ interface AgentState {
   autoRefresh: boolean; // 是否自动刷新
   apiStopped: boolean; // API 是否已停止（连续失败后）
   failCount: number; // 失败计数器（每次 refreshAll 计数 1 次）
+  modalOpen: boolean; // 是否有弹窗打开（日志详情等）
   
   // 操作
   fetchAgents: () => Promise<void>;
@@ -31,6 +32,7 @@ interface AgentState {
   setRefreshInterval: (interval: number) => void;
   toggleAutoRefresh: () => void;
   resetApiRetry: () => void;
+  setModalOpen: (open: boolean) => void;
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -46,6 +48,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   autoRefresh: true, // 默认开启自动刷新
   apiStopped: false, // API 未停止
   failCount: 0, // 失败计数 0
+  modalOpen: false, // 弹窗关闭状态
 
   // 获取 Agent 列表
   fetchAgents: async () => {
@@ -87,6 +90,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     // 如果 API 已停止，不再刷新
     if (state.apiStopped) {
       console.warn('[Store] API 已停止，跳过 refreshAll');
+      return;
+    }
+    
+    // 如果有弹窗打开，跳过刷新（避免影响用户体验和浪费资源）
+    if (state.modalOpen) {
+      console.debug('[Store] 弹窗打开中，跳过 refreshAll');
       return;
     }
     
@@ -148,5 +157,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       resetApiStopped();
       console.log('[Store] API 重试计数器已重置');
     });
+  },
+
+  // 设置弹窗状态
+  setModalOpen: (open: boolean) => {
+    set({ modalOpen: open });
+    if (open) {
+      console.log('[Store] 弹窗打开，暂停自动刷新');
+    } else {
+      console.log('[Store] 弹窗关闭，恢复自动刷新');
+    }
   },
 }));

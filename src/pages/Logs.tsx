@@ -388,7 +388,7 @@ function Logs() {
             </>
           )}
           {logSource === 'gateway' && (
-            <li>• Gateway 日志：WebSocket 实时推送（<100ms 延迟）</li>
+            <li>• Gateway 日志：WebSocket 实时推送（{'<'}100ms 延迟）</li>
           )}
           <li>• 自动滚动：默认自动滚动到最新日志，不影响外部页面滚动</li>
         </ul>

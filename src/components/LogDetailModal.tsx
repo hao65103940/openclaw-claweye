@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import api from '@/services/api';
 import type { Agent } from '@/types';
 import { useState, useEffect, useRef } from 'react';
+import { useAgentStore } from '@/store/useAgentStore';
 
 interface LogDetailModalProps {
   agent: Agent & { timestamp?: number };
@@ -32,6 +33,20 @@ function LogDetailModal({ agent, onClose }: LogDetailModalProps) {
   const [activeTab, setActiveTab] = useState<'logs' | 'tools' | 'messages'>('logs');
   const [isPaused, setIsPaused] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  
+  // 获取 store 中的 setModalOpen
+  const setModalOpen = useAgentStore((state) => state.setModalOpen);
+
+  // 弹窗打开时暂停外部刷新，关闭时恢复
+  useEffect(() => {
+    // 打开弹窗，暂停外部刷新
+    setModalOpen(true);
+    
+    // 清理函数：关闭弹窗时恢复刷新
+    return () => {
+      setModalOpen(false);
+    };
+  }, [setModalOpen]);
 
   useEffect(() => {
     loadHistory();
