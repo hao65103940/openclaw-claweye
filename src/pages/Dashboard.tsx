@@ -411,6 +411,29 @@ function Dashboard() {
     totalTokens: 0,
   };
 
+  // 告警检测
+  const alerts: Array<{ type: 'error' | 'warning'; message: string; count?: number }> = [];
+  
+  // 检测失败会话
+  const failedSessions = (recentAgents || []).filter(a => a.status === 'failed');
+  if (failedSessions.length > 0) {
+    alerts.push({
+      type: 'error',
+      message: `❌ ${failedSessions.length} 个会话失败，需要检查`,
+      count: failedSessions.length,
+    });
+  }
+  
+  // 检测 Token 超支（>100 万）
+  const highTokenSessions = (activeAgents || []).filter(a => (a.totalTokens || 0) > 1000000);
+  if (highTokenSessions.length > 0) {
+    alerts.push({
+      type: 'warning',
+      message: `⚠️ ${highTokenSessions.length} 个会话 Token 超 100 万`,
+      count: highTokenSessions.length,
+    });
+  }
+
   // 筛选会话列表
   const filteredActiveAgents = (activeAgents || []).filter(agent => {
     const matchKeyword = !searchKeyword || 
@@ -430,6 +453,37 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* 告警横幅 */}
+      {alerts.length > 0 && (
+        <div className="space-y-3">
+          {alerts.map((alert, index) => (
+            <div
+              key={index}
+              className={`rounded-lg p-4 border-l-4 ${
+                alert.type === 'error'
+                  ? 'bg-red-900/30 border-red-700'
+                  : 'bg-yellow-900/30 border-yellow-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">
+                    {alert.type === 'error' ? '🚨' : '⚠️'}
+                  </span>
+                  <div>
+                    <p className={`font-semibold ${
+                      alert.type === 'error' ? 'text-red-300' : 'text-yellow-300'
+                    }`}>
+                      {alert.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* 状态提示 */}
       {apiStopped ? (
         <div className="rounded-lg p-4 border bg-red-900/30 border-red-700">
