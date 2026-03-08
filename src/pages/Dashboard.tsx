@@ -151,18 +151,6 @@ function AgentTable({ agents, title, emptyMessage, onViewLog }: {
                       >
                         📋 查看
                       </button>
-                      {agent.status === 'running' && (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            alert('💡 提示：\n\nOpenClaw CLI 暂不支持直接停止会话。\n\n会话会在完成任务后自动结束，\n或者等待定时任务自然完成。\n\n未来版本将支持会话管理功能。');
-                          }}
-                          className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors whitespace-nowrap"
-                          title="停止会话（暂不支持）"
-                        >
-                          ⏹️ 停止
-                        </button>
-                      )}
                     </div>
                   </td>
                 )}
@@ -285,18 +273,6 @@ function PaginatedAgentTable({ agents, title, pageSize = 10, onViewLog }: {
                       >
                         📋 查看
                       </button>
-                      {agent.status === 'running' && (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            alert('💡 提示：\n\nOpenClaw CLI 暂不支持直接停止会话。\n\n会话会在完成任务后自动结束，\n或者等待定时任务自然完成。\n\n未来版本将支持会话管理功能。');
-                          }}
-                          className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors whitespace-nowrap"
-                          title="停止会话（暂不支持）"
-                        >
-                          ⏹️ 停止
-                        </button>
-                      )}
                     </div>
                   </td>
                 )}
