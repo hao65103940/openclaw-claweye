@@ -329,19 +329,31 @@ function extractTaskDescription(sessionKey, sessionId) {
     const lines = fs.readFileSync(jsonlPath, 'utf-8').split('\n').filter(line => line.trim());
     if (lines.length === 0) return null;
     
-    // 读取前 5 条消息，找第一条用户消息
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
+    // 读取前 10 条消息，找第一条用户消息（跳过 metadata）
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
       const record = JSON.parse(lines[i]);
       if (record.type === 'message' && record.message?.role === 'user') {
         const content = record.message.content;
+        let text = '';
+        
         // content 可能是字符串或数组
         if (typeof content === 'string') {
-          return content.substring(0, 100);
+          text = content;
         } else if (Array.isArray(content)) {
           const textItem = content.find(item => item.type === 'text');
           if (textItem?.text) {
-            return textItem.text.substring(0, 100);
+            text = textItem.text;
           }
+        }
+        
+        // 过滤掉 metadata 相关的文本
+        if (text.includes('Conversation info') || text.includes('untrusted metadata')) {
+          continue;
+        }
+        
+        // 返回前 100 个字符
+        if (text.trim().length > 0) {
+          return text.substring(0, 100).trim();
         }
       }
     }
