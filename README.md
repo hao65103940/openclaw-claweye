@@ -4,15 +4,29 @@
 
 ## 🚀 快速开始
 
-### 启动服务
+### 一键启动（推荐）
 
 ```bash
 cd /root/.openclaw/monitor-platform
 
-# 启动后端 API 服务
+# 启动前后端服务（一起启动）
+./start.sh
+
+# 停止服务（一起停止）
+./stop.sh
+
+# 查看日志
+tail -f logs/server.log      # 后端日志
+tail -f logs/frontend.log    # 前端日志
+```
+
+### 手动启动（可选）
+
+```bash
+# 启动后端
 node server.js &
 
-# 启动前端开发服务器
+# 启动前端
 npm run dev
 ```
 
