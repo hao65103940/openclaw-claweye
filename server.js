@@ -480,6 +480,55 @@ app.get('/api/trace/flow', (req, res) => {
 });
 
 /**
+ * GET /api/analytics/token-trends
+ * Token 使用趋势（按会话分布）
+ */
+app.get('/api/analytics/token-trends', (req, res) => {
+  try {
+    const sessionsData = getSessionsData();
+    const sessions = sessionsData.sessions || [];
+    
+    // 按 Token 降序排序，取前 20 个
+    const sorted = sessions
+      .filter(s => s.totalTokens && s.totalTokens > 0)
+      .sort((a, b) => (b.totalTokens || 0) - (a.totalTokens || 0))
+      .slice(0, 20);
+    
+    // 计算汇总统计
+    const totalTokens = sessions.reduce((sum, s) => sum + (s.totalTokens || 0), 0);
+    const avgPerSession = sessions.length > 0 ? Math.round(totalTokens / sessions.length) : 0;
+    const maxSession = sessions.length > 0 ? Math.max(...sessions.map(s => s.totalTokens || 0)) : 0;
+    
+    res.json({
+      success: true,
+      sessions: sorted.map(s => ({
+        id: s.id,
+        sessionId: s.sessionId,
+        label: s.label || s.task?.substring(0, 50) || '未知会话',
+        totalTokens: s.totalTokens || 0,
+        inputTokens: s.inputTokens || 0,
+        outputTokens: s.outputTokens || 0,
+        contextTokens: s.contextTokens || 0,
+        status: s.status,
+        updatedAt: s.updatedAt,
+      })),
+      summary: {
+        total: totalTokens,
+        avgPerSession,
+        maxSession,
+        sessionCount: sessions.length,
+      },
+    });
+  } catch (error) {
+    console.error('Token 趋势 API 错误:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/analytics/channels
  * 渠道统计
  */

@@ -6,6 +6,7 @@ import 'dayjs/locale/zh-cn';
 import { useAgentStore } from '../store/useAgentStore';
 import type { Agent, Stats } from '../types';
 import LogDetailModal from '../components/LogDetailModal';
+import TokenTrend from '../components/TokenTrend';
 import { io, Socket } from 'socket.io-client';
 
 dayjs.extend(duration);
@@ -603,6 +604,9 @@ function Dashboard() {
           subtext="累计消耗"
         />
       </div>
+
+      {/* Token 使用趋势图 */}
+      <TokenTrend />
 
       {/* 活跃会话 */}
       <AgentTable 
